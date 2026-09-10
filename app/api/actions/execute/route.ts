@@ -30,12 +30,18 @@ export async function POST(request: Request) {
   if (!body) return NextResponse.json({ error: 'Invalid execution request.' }, { status: 400 });
 
   const token = verifyActionToken(typeof body.token === 'string' ? body.token : undefined);
-  const sessionId = sanitizeId(body.sessionId, 'web');
+  const suppliedSession = typeof body.sessionId === 'string' ? sanitizeId(body.sessionId, 'web') : null;
   const toolSlug = normalizeToolSlug(body.toolSlug);
   const argumentsValue = sanitizeActionArguments(body.arguments);
   const connectedAccountId = typeof body.connectedAccountId === 'string' ? body.connectedAccountId.trim().slice(0, 160) : undefined;
 
-  if (!token || !toolSlug || !argumentsValue || token.profileId !== profile.profileId || token.sessionId !== sessionId) {
+  if (
+    !token ||
+    !toolSlug ||
+    !argumentsValue ||
+    token.profileId !== profile.profileId ||
+    (suppliedSession && token.sessionId !== suppliedSession)
+  ) {
     return NextResponse.json({ error: 'Invalid or expired action authorization.' }, { status: 401 });
   }
 
