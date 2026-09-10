@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@deepgram/agents": "0.1.1",
     "@honcho-ai/sdk": "2.4.0",
     "lucide-react": "1.43.0",
     "next": "16.3.4",
