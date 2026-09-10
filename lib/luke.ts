@@ -33,26 +33,32 @@ export type ReasoningProvider = {
   model: string;
 };
 
-export function getReasoningProvider(): ReasoningProvider | null {
+export function getReasoningProviders(): ReasoningProvider[] {
+  const providers: ReasoningProvider[] = [];
+
   if (process.env.HERMES_BASE_URL) {
-    return {
+    providers.push({
       name: 'hermes',
       baseUrl: process.env.HERMES_BASE_URL.replace(/\/$/, ''),
       apiKey: process.env.HERMES_API_KEY || '',
-      model: process.env.HERMES_MODEL || 'hermes-3-llama-3.1-8b',
-    };
+      model: process.env.HERMES_MODEL || 'hermes-agent',
+    });
   }
 
   if (process.env.TOGETHER_API_KEY) {
-    return {
+    providers.push({
       name: 'together',
       baseUrl: 'https://api.together.xyz/v1',
       apiKey: process.env.TOGETHER_API_KEY,
       model: process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-    };
+    });
   }
 
-  return null;
+  return providers;
+}
+
+export function getReasoningProvider(): ReasoningProvider | null {
+  return getReasoningProviders()[0] || null;
 }
 
 export async function buildLukeSystemPrompt(profileId: string, sessionId: string) {
@@ -68,37 +74,50 @@ export async function runLuke(args: {
   profileId: string;
   sessionId: string;
 }) {
-  const provider = getReasoningProvider();
-  if (!provider) {
+  const providers = getReasoningProviders();
+  if (!providers.length) {
     throw new Error('No reasoning provider configured. Set HERMES_BASE_URL or TOGETHER_API_KEY.');
   }
 
   const system = await buildLukeSystemPrompt(args.profileId, args.sessionId);
   const history = args.messages.filter((message) => message.role !== 'system').slice(-18);
+  const failures: string[] = [];
 
-  const response = await fetch(`${provider.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}),
-    },
-    body: JSON.stringify({
-      model: provider.model,
-      messages: [{ role: 'system', content: system }, ...history],
-      temperature: 0.3,
-      max_tokens: 1200,
-    }),
-    signal: AbortSignal.timeout(45_000),
-  });
+  for (const provider of providers) {
+    try {
+      const response = await fetch(`${provider.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}),
+        },
+        body: JSON.stringify({
+          model: provider.model,
+          messages: [{ role: 'system', content: system }, ...history],
+          temperature: 0.3,
+          max_tokens: 1200,
+        }),
+        signal: AbortSignal.timeout(provider.name === 'hermes' ? 20_000 : 45_000),
+      });
 
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(`${provider.name} request failed (${response.status}): ${detail.slice(0, 240)}`);
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        failures.push(`${provider.name}:${response.status}:${detail.slice(0, 120)}`);
+        continue;
+      }
+
+      const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const text = data.choices?.[0]?.message?.content?.trim();
+      if (!text) {
+        failures.push(`${provider.name}:empty`);
+        continue;
+      }
+
+      return { text, provider: provider.name };
+    } catch (error) {
+      failures.push(`${provider.name}:${error instanceof Error ? error.name : 'error'}`);
+    }
   }
 
-  const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const text = data.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new Error(`${provider.name} returned an empty completion.`);
-
-  return { text, provider: provider.name };
+  throw new Error(`All reasoning providers failed (${failures.join(', ') || 'unknown error'}).`);
 }
