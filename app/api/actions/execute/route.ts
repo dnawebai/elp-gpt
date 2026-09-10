@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { actionDigest, normalizeToolSlug, sanitizeActionArguments } from '@/lib/actions';
 import { executeComposioTool, isComposioConfigured } from '@/lib/composio';
-import { PROFILE_COOKIE, verifyActionToken, verifyProfileToken } from '@/lib/security';
+import { PROFILE_COOKIE, sanitizeId, verifyActionToken, verifyProfileToken } from '@/lib/security';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as {
     token?: unknown;
+    sessionId?: unknown;
     toolSlug?: unknown;
     arguments?: unknown;
     connectedAccountId?: unknown;
@@ -29,11 +30,12 @@ export async function POST(request: Request) {
   if (!body) return NextResponse.json({ error: 'Invalid execution request.' }, { status: 400 });
 
   const token = verifyActionToken(typeof body.token === 'string' ? body.token : undefined);
+  const sessionId = sanitizeId(body.sessionId, 'web');
   const toolSlug = normalizeToolSlug(body.toolSlug);
   const argumentsValue = sanitizeActionArguments(body.arguments);
   const connectedAccountId = typeof body.connectedAccountId === 'string' ? body.connectedAccountId.trim().slice(0, 160) : undefined;
 
-  if (!token || !toolSlug || !argumentsValue || token.profileId !== profile.profileId) {
+  if (!token || !toolSlug || !argumentsValue || token.profileId !== profile.profileId || token.sessionId !== sessionId) {
     return NextResponse.json({ error: 'Invalid or expired action authorization.' }, { status: 401 });
   }
 
