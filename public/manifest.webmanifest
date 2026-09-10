@@ -1,0 +1,11 @@
+{
+  "name": "LUCY — ELP GPT",
+  "short_name": "LUCY",
+  "description": "Personal intelligence assistant",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030711",
+  "theme_color": "#050914",
+  "orientation": "any",
+  "categories": ["productivity", "utilities"]
+}
