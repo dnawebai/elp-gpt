@@ -171,7 +171,7 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
         for (const fn of message.functions || []) {
           let input: Record<string, unknown> = {};
           try {
-            input = JSON.parse(fn.input || '{}') as Record<string, unknown>;
+            input = JSON.parse(fn.arguments || '{}') as Record<string, unknown>;
           } catch {
             input = {};
           }
