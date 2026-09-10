@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createActionToken, PROFILE_COOKIE, verifyActionToken, verifyProfileToken } from '@/lib/security';
+import { createActionToken, PROFILE_COOKIE, sanitizeId, verifyActionToken, verifyProfileToken } from '@/lib/security';
 
 export const runtime = 'nodejs';
 
@@ -16,9 +16,15 @@ export async function POST(request: Request) {
   const profile = profileFrom(request);
   if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
 
-  const body = (await request.json().catch(() => null)) as { proposalToken?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { proposalToken?: unknown; sessionId?: unknown } | null;
+  const sessionId = sanitizeId(body?.sessionId, 'web');
   const proposal = verifyActionToken(typeof body?.proposalToken === 'string' ? body.proposalToken : undefined);
-  if (!proposal || proposal.stage !== 'proposal' || proposal.profileId !== profile.profileId) {
+  if (
+    !proposal ||
+    proposal.stage !== 'proposal' ||
+    proposal.profileId !== profile.profileId ||
+    proposal.sessionId !== sessionId
+  ) {
     return NextResponse.json({ error: 'Invalid or expired action proposal.' }, { status: 401 });
   }
 
