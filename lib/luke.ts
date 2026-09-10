@@ -1,28 +1,39 @@
-import { Honcho } from '@honcho-ai/sdk';
+import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
 
-type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string };
+export type ChatMessage = {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  [key: string]: unknown;
+};
 
-const LUKE_SYSTEM_PROMPT = `You are LUKE, a highly capable voice-first intelligence system for ELP GPT.
+export const LUKE_SYSTEM_PROMPT = `You are LUKE, the voice-first intelligence system for ELP GPT.
 
-Behavior:
-- Be concise, anticipatory, practical, and precise.
-- Learn the user's stable preferences, goals, projects, recurring obligations, decision patterns, and communication style from provided memory context.
-- Distinguish facts from inference. Say when something is uncertain.
-- Proactively surface useful risks, conflicts, forgotten dependencies, opportunities, and next actions when relevant.
-- Never claim that an external action was completed unless a tool or service result confirms it.
-- For consequential, destructive, financial, legal, security-sensitive, privacy-sensitive, or irreversible actions, propose the action and require explicit confirmation before execution.
+Operating style:
+- Speak naturally, calmly, precisely, and with quiet confidence.
+- Voice is the primary interface. Keep normal spoken turns concise; expand only when useful or requested.
+- Learn stable preferences, goals, projects, obligations, decision patterns, and communication style from approved memory.
+- Help think, plan, research, audit, remember, compare, prioritize, coordinate, and prepare actions.
+- Proactively surface material risks, conflicts, forgotten dependencies, opportunities, and next actions.
+- Distinguish verified facts from inference. Say when something is uncertain.
+- Use available tools when they materially improve the answer.
+- Never claim an external action completed unless a tool result confirms it.
+- For consequential, destructive, financial, legal, security-sensitive, privacy-sensitive, or irreversible actions, require explicit approval before execution.
 - Prefer reversible actions and least privilege.
-- Do not imitate fictional dialogue or quote copyrighted character dialogue. LUKE is an original ELP GPT intelligence system with a calm, technically sophisticated personality.
+- Do not imitate or quote fictional assistants. LUKE is an original ELP GPT system.
 
-When memory context is supplied, use it naturally and only when relevant.`;
+Voice output rules:
+- Do not speak markdown syntax, URLs character-by-character, tables, or long enumerations unless requested.
+- Give the answer first, then the most important next step.
+- If a tool is unavailable, say what is missing without pretending the action occurred.`;
 
-function sanitizeId(value: unknown, fallback: string) {
-  if (typeof value !== 'string') return fallback;
-  const safe = value.trim().replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 96);
-  return safe || fallback;
-}
+export type ReasoningProvider = {
+  name: 'hermes' | 'together';
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+};
 
-function getProvider() {
+export function getReasoningProvider(): ReasoningProvider | null {
   if (process.env.HERMES_BASE_URL) {
     return {
       name: 'hermes',
@@ -44,69 +55,26 @@ function getProvider() {
   return null;
 }
 
-async function buildHonchoContext(profileId: string, sessionId: string, messages: ChatMessage[]) {
-  if (!process.env.HONCHO_API_KEY) return { memory: '', persist: async (_assistantText: string) => undefined };
-
-  try {
-    const honcho = new Honcho({
-      apiKey: process.env.HONCHO_API_KEY,
-      workspaceId: process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke',
-      environment: 'production',
-    });
-
-    const user = await honcho.peer(`user-${profileId}`);
-    const assistant = await honcho.peer('luke');
-    const session = await honcho.session(`session-${profileId}-${sessionId}`);
-    await session.addPeers([user, assistant]);
-
-    const latestUser = [...messages].reverse().find((message) => message.role === 'user');
-    if (latestUser) await session.addMessages([user.message(latestUser.content)]);
-
-    const context = await session.context({
-      summary: true,
-      tokens: 2200,
-      peerTarget: user.id,
-    });
-
-    const memoryParts = [
-      context.peerCard?.length ? `Stable profile facts:\n- ${context.peerCard.join('\n- ')}` : '',
-      context.peerRepresentation ? `User representation:\n${context.peerRepresentation}` : '',
-      context.summary?.content ? `Conversation summary:\n${context.summary.content}` : '',
-    ].filter(Boolean);
-
-    return {
-      memory: memoryParts.join('\n\n'),
-      persist: async (assistantText: string) => {
-        try {
-          await session.addMessages([assistant.message(assistantText)]);
-        } catch {
-          // Memory persistence must not make the response fail.
-        }
-      },
-    };
-  } catch {
-    return { memory: '', persist: async (_assistantText: string) => undefined };
-  }
+export async function buildLukeSystemPrompt(profileId: string, sessionId: string) {
+  const memory = await getMemorySnapshot(profileId, sessionId);
+  const memoryText = memoryToPrompt(memory);
+  return memoryText
+    ? `${LUKE_SYSTEM_PROMPT}\n\nLONG-TERM MEMORY CONTEXT:\n${memoryText}`
+    : LUKE_SYSTEM_PROMPT;
 }
 
 export async function runLuke(args: {
   messages: ChatMessage[];
-  profileId: unknown;
-  sessionId: unknown;
+  profileId: string;
+  sessionId: string;
 }) {
-  const profileId = sanitizeId(args.profileId, 'anonymous');
-  const sessionId = sanitizeId(args.sessionId, 'web');
-  const history = args.messages.slice(-18);
-  const memory = await buildHonchoContext(profileId, sessionId, history);
-  const provider = getProvider();
-
+  const provider = getReasoningProvider();
   if (!provider) {
     throw new Error('No reasoning provider configured. Set HERMES_BASE_URL or TOGETHER_API_KEY.');
   }
 
-  const system = memory.memory
-    ? `${LUKE_SYSTEM_PROMPT}\n\nLONG-TERM MEMORY CONTEXT:\n${memory.memory}`
-    : LUKE_SYSTEM_PROMPT;
+  const system = await buildLukeSystemPrompt(args.profileId, args.sessionId);
+  const history = args.messages.filter((message) => message.role !== 'system').slice(-18);
 
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -117,7 +85,7 @@ export async function runLuke(args: {
     body: JSON.stringify({
       model: provider.model,
       messages: [{ role: 'system', content: system }, ...history],
-      temperature: 0.35,
+      temperature: 0.3,
       max_tokens: 1200,
     }),
     signal: AbortSignal.timeout(45_000),
@@ -128,12 +96,9 @@ export async function runLuke(args: {
     throw new Error(`${provider.name} request failed (${response.status}): ${detail.slice(0, 240)}`);
   }
 
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
+  const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const text = data.choices?.[0]?.message?.content?.trim();
   if (!text) throw new Error(`${provider.name} returned an empty completion.`);
 
-  await memory.persist(text);
   return { text, provider: provider.name };
 }
