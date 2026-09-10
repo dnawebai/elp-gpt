@@ -1,11 +1,9 @@
-import { NextResponse } from 'next/server';
-
 export const runtime = 'nodejs';
 
 export async function POST() {
   const apiKey = process.env.DEEPGRAM_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'Deepgram is not configured.' }, { status: 503 });
+    return new Response('Deepgram is not configured.', { status: 503 });
   }
 
   try {
@@ -22,20 +20,23 @@ export async function POST() {
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
       console.error('Deepgram token grant failed', response.status, detail.slice(0, 200));
-      return NextResponse.json({ error: 'Voice token unavailable.' }, { status: 502 });
+      return new Response('Voice token unavailable.', { status: 502 });
     }
 
-    const token = (await response.json()) as { access_token?: string; expires_in?: number };
+    const token = (await response.json()) as { access_token?: string };
     if (!token.access_token) {
-      return NextResponse.json({ error: 'Invalid voice token response.' }, { status: 502 });
+      return new Response('Invalid voice token response.', { status: 502 });
     }
 
-    return NextResponse.json(
-      { accessToken: token.access_token, expiresIn: token.expires_in ?? 60 },
-      { headers: { 'Cache-Control': 'no-store, private' } },
-    );
+    return new Response(token.access_token, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store, private',
+      },
+    });
   } catch (error) {
     console.error('Deepgram token error', error);
-    return NextResponse.json({ error: 'Voice service unavailable.' }, { status: 502 });
+    return new Response('Voice service unavailable.', { status: 502 });
   }
 }
