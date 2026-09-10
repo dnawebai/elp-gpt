@@ -5,6 +5,18 @@ export const PROFILE_COOKIE = 'luke_profile';
 type SecurityMode = 'dedicated' | 'service-derived' | 'development';
 type GatewayClaims = { kind: 'voice'; profileId: string; sessionId: string; exp: number };
 type ProfileClaims = { kind: 'profile'; profileId: string; exp: number };
+export type ActionTokenStage = 'proposal' | 'approved';
+export type ActionTokenRisk = 'read' | 'write' | 'high';
+type ActionClaims = {
+  kind: 'action';
+  stage: ActionTokenStage;
+  profileId: string;
+  sessionId: string;
+  digest: string;
+  risk: ActionTokenRisk;
+  nonce: string;
+  exp: number;
+};
 
 function secretInfo(): { secret: string; mode: SecurityMode } {
   if (process.env.LUKE_SESSION_SECRET) {
@@ -15,7 +27,8 @@ function secretInfo(): { secret: string; mode: SecurityMode } {
     process.env.HERMES_API_KEY ||
     process.env.TOGETHER_API_KEY ||
     process.env.HONCHO_API_KEY ||
-    process.env.DEEPGRAM_API_KEY;
+    process.env.DEEPGRAM_API_KEY ||
+    process.env.COMPOSIO_API_KEY;
 
   if (derived) return { secret: derived, mode: 'service-derived' };
   return { secret: 'elp-gpt-development-only-no-provider-secret', mode: 'development' };
@@ -80,6 +93,44 @@ export function verifyVoiceGatewayToken(token: string | undefined) {
     claims.kind !== 'voice' ||
     !isSafeId(claims.profileId) ||
     !isSafeId(claims.sessionId)
+  ) {
+    return null;
+  }
+  return claims;
+}
+
+export function createActionToken(input: {
+  stage: ActionTokenStage;
+  profileId: string;
+  sessionId: string;
+  digest: string;
+  risk: ActionTokenRisk;
+  nonce?: string;
+  ttlSeconds?: number;
+}) {
+  return mint<ActionClaims>({
+    kind: 'action',
+    stage: input.stage,
+    profileId: input.profileId,
+    sessionId: input.sessionId,
+    digest: input.digest,
+    risk: input.risk,
+    nonce: input.nonce || randomUUID(),
+    exp: Math.floor(Date.now() / 1000) + Math.max(30, Math.min(input.ttlSeconds || 300, 600)),
+  });
+}
+
+export function verifyActionToken(token: string | undefined) {
+  const claims = verify<ActionClaims>(token);
+  if (
+    !claims ||
+    claims.kind !== 'action' ||
+    !isSafeId(claims.profileId) ||
+    !isSafeId(claims.sessionId) ||
+    !/^[A-Za-z0-9_-]{20,100}$/.test(claims.digest) ||
+    !['proposal', 'approved'].includes(claims.stage) ||
+    !['read', 'write', 'high'].includes(claims.risk) ||
+    typeof claims.nonce !== 'string'
   ) {
     return null;
   }

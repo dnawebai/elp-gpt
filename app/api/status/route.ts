@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isComposioConfigured } from '@/lib/composio';
 import { getDeepgramRuntimeConfig, isDeepgramConfigured, verifyDeepgramConnection } from '@/lib/deepgram';
 import { getReasoningProvider } from '@/lib/luke';
 import { getSecurityMode } from '@/lib/security';
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
     memory: Boolean(process.env.HONCHO_API_KEY),
     hermes: Boolean(process.env.HERMES_BASE_URL),
     together: Boolean(process.env.TOGETHER_API_KEY),
+    composio: isComposioConfigured(),
     securityMode: getSecurityMode(),
     voiceModel: config.voiceModel,
     listenModel: config.listenModel,
