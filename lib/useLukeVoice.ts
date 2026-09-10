@@ -15,15 +15,32 @@ type Options = {
 };
 
 type VoiceSessionConfig = {
-  token: string;
-  thinkEndpoint: string;
+  token?: string;
+  thinkEndpoint?: string;
   model: string;
   voiceModel: string;
+  voiceSpeed: number;
+  speakVersion: 'v1' | 'v2';
   listenModel: string;
+  listenVersion: 'v1' | 'v2';
+  languageHints: string[];
+  keyterms: string[];
+  eotThreshold: number;
+  eagerEotThreshold: number;
+  eotTimeoutMs: number;
+  agentUrl?: string | null;
+  reasoningMode: 'external' | 'deepgram-managed';
   reasoningProvider: string;
 };
 
-const VOICE_PROMPT = `You are LUKE, the voice-first intelligence system for ELP GPT. Speak naturally and concisely. Use profile navigation tools when the user asks to see memory, skills, signals, briefings, permissions, system status, or their profile. Use get_system_status when asked whether services are online. Never say an external action happened unless a tool confirms it. Require explicit approval for consequential or irreversible external actions.`;
+const VOICE_PROMPT = `You are LUKE, the voice-first intelligence system for ELP GPT.
+
+Speak naturally, calmly, precisely, and concisely. Voice is the primary interface.
+Use profile navigation tools when the user asks to see memory, skills, signals, briefings, permissions, system status, or their profile.
+Use get_system_status when asked whether services are online.
+Never claim an external action happened unless a tool confirms it.
+Require explicit approval for consequential, destructive, financial, legal, security-sensitive, privacy-sensitive, or irreversible actions.
+Do not imitate fictional dialogue. LUKE is an original ELP GPT system.`;
 
 const UI_FUNCTIONS = [
   {
@@ -110,22 +127,48 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
       const voiceConfig = (await configResponse.json()) as VoiceSessionConfig;
 
       const player = new AgentPlayer({ sampleRate: 24_000 });
+
+      const listenProvider: Record<string, unknown> = {
+        type: 'deepgram',
+        version: voiceConfig.listenVersion,
+        model: voiceConfig.listenModel,
+      };
+      if (voiceConfig.listenVersion === 'v2') {
+        listenProvider.eot_threshold = voiceConfig.eotThreshold;
+        listenProvider.eager_eot_threshold = voiceConfig.eagerEotThreshold;
+        listenProvider.eot_timeout_ms = voiceConfig.eotTimeoutMs;
+        listenProvider.keyterms = voiceConfig.keyterms;
+        if (voiceConfig.listenModel === 'flux-general-multi') {
+          listenProvider.language_hints = voiceConfig.languageHints;
+        }
+      }
+
+      const think: Record<string, unknown> = {
+        provider: { type: 'open_ai', version: 'v1', model: voiceConfig.model, temperature: 0.3 },
+        prompt: VOICE_PROMPT,
+        functions: UI_FUNCTIONS,
+      };
+      if (voiceConfig.reasoningMode === 'external') {
+        if (!voiceConfig.token || !voiceConfig.thinkEndpoint) {
+          throw new Error('LUKE external reasoning session is incomplete.');
+        }
+        think.endpoint = {
+          url: voiceConfig.thinkEndpoint,
+          headers: { authorization: `Bearer ${voiceConfig.token}` },
+        };
+        think.context_length = 'max';
+      }
+
       const agentConfig = {
-        listen: {
-          provider: { type: 'deepgram', version: 'v2', model: voiceConfig.listenModel },
-        },
-        think: {
-          provider: { type: 'open_ai', model: voiceConfig.model, temperature: 0.3 },
-          endpoint: {
-            url: voiceConfig.thinkEndpoint,
-            headers: { authorization: `Bearer ${voiceConfig.token}` },
-          },
-          prompt: VOICE_PROMPT,
-          contextLength: 'max',
-          functions: UI_FUNCTIONS,
-        },
+        listen: { provider: listenProvider },
+        think,
         speak: {
-          provider: { type: 'deepgram', model: voiceConfig.voiceModel },
+          provider: {
+            type: 'deepgram',
+            version: voiceConfig.speakVersion,
+            model: voiceConfig.voiceModel,
+            speed: voiceConfig.voiceSpeed,
+          },
         },
         greeting: 'LUKE online.',
       } as any;
@@ -138,6 +181,7 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
             return response.text();
           },
         },
+        ...(voiceConfig.agentUrl ? { url: voiceConfig.agentUrl } : {}),
         agent: agentConfig,
         audio: {
           input: { encoding: 'linear16', sampleRate: 16_000 },
@@ -179,7 +223,7 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
           try {
             let result: unknown;
             if (fn.name === 'get_system_status') {
-              const response = await fetch('/api/status', { cache: 'no-store' });
+              const response = await fetch('/api/status?probe=1', { cache: 'no-store' });
               result = response.ok ? await response.json() : { error: 'System status unavailable.' };
             } else if (onCommand) {
               result = await onCommand({ name: fn.name, input });
@@ -199,7 +243,7 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
       session.on('sdk-error', (error) => {
         console.error('Deepgram voice SDK error', error);
         setState('error');
-        onError?.('Realtime voice encountered a connection error.');
+        onError?.('Realtime voice encountered a Deepgram connection error.');
       });
       session.on('error', (error) => {
         console.error('Deepgram voice agent error', error);
