@@ -1,11 +1,11 @@
 {
-  "name": "LUCY — ELP GPT",
-  "short_name": "LUCY",
-  "description": "Personal intelligence assistant",
+  "name": "LUKE — ELP GPT",
+  "short_name": "LUKE",
+  "description": "Voice-first intelligence system",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#030711",
-  "theme_color": "#050914",
+  "background_color": "#010813",
+  "theme_color": "#010813",
   "orientation": "any",
   "categories": ["productivity", "utilities"]
 }
