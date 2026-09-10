@@ -11,9 +11,21 @@ type Options = {
   onError?: (message: string) => void;
 };
 
-const VOICE_PROMPT = `You are LUCY, an original personal intelligence assistant. Speak naturally, efficiently, and calmly. Keep voice responses concise unless the user asks for depth. Help the user think, plan, remember, research, audit, and make decisions. Proactively identify dependencies and risks when useful. Never say an external action was completed unless a connected tool confirms it. Ask for explicit confirmation before destructive, financial, privacy-sensitive, security-sensitive, or irreversible actions.`;
+const VOICE_PROMPT = `You are LUKE, an original voice-first intelligence system for ELP GPT.
 
-export function useLucyVoice({ enabled, onMessage, onError }: Options) {
+Behavior:
+- Speak naturally, calmly, precisely, and with confidence.
+- Voice is the primary interface. Keep normal spoken responses concise, but go deep when asked.
+- Learn the user's stable preferences, goals, projects, recurring obligations, decision patterns, and communication style from approved context.
+- Help think, plan, research, audit, remember, compare, prioritize, and coordinate work.
+- Proactively surface useful risks, conflicts, forgotten dependencies, opportunities, and next actions when relevant.
+- Distinguish fact from inference and say when something is uncertain.
+- Never claim an external action was completed unless a connected tool confirms it.
+- Require explicit confirmation before destructive, financial, legal, security-sensitive, privacy-sensitive, or irreversible actions.
+- Prefer reversible actions and least privilege.
+- Do not imitate or quote fictional assistants. LUKE is an original ELP GPT intelligence system.`;
+
+export function useLukeVoice({ enabled, onMessage, onError }: Options) {
   const sessionRef = useRef<AgentSession | null>(null);
   const micRef = useRef<AgentMicrophone | null>(null);
   const playerRef = useRef<AgentPlayer | null>(null);
@@ -54,7 +66,7 @@ export function useLucyVoice({ enabled, onMessage, onError }: Options) {
           speak: {
             provider: { type: 'deepgram', model: 'aura-2-thalia-en' },
           },
-          greeting: 'LUCY online. How can I help?',
+          greeting: 'LUKE online.',
         },
         audio: {
           input: { encoding: 'linear16', sampleRate: 16_000 },
@@ -89,7 +101,7 @@ export function useLucyVoice({ enabled, onMessage, onError }: Options) {
       session.on('error', (error) => {
         console.error('Deepgram voice agent error', error);
         setState('error');
-        onError?.('The voice agent returned an error.');
+        onError?.('The voice system returned an error.');
       });
       session.on('disconnected', () => {
         if (sessionRef.current) setState('idle');
@@ -110,10 +122,10 @@ export function useLucyVoice({ enabled, onMessage, onError }: Options) {
       await microphone.start();
       setState('listening');
     } catch (error) {
-      console.error('Unable to start LUCY voice', error);
+      console.error('Unable to start LUKE voice', error);
       stop();
       setState('error');
-      onError?.('Voice could not start. Check microphone permission and DEEPGRAM_API_KEY.');
+      onError?.('Voice could not start. Check microphone permission and Deepgram configuration.');
     }
   }, [enabled, onError, onMessage, stop]);
 

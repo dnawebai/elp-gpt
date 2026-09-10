@@ -2,17 +2,17 @@ import { Honcho } from '@honcho-ai/sdk';
 
 type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string };
 
-const LUCY_SYSTEM_PROMPT = `You are LUCY, a highly capable personal intelligence assistant.
+const LUKE_SYSTEM_PROMPT = `You are LUKE, a highly capable voice-first intelligence system for ELP GPT.
 
 Behavior:
 - Be concise, anticipatory, practical, and precise.
 - Learn the user's stable preferences, goals, projects, recurring obligations, decision patterns, and communication style from provided memory context.
 - Distinguish facts from inference. Say when something is uncertain.
-- Proactively surface useful risks, conflicts, forgotten dependencies, and next actions when relevant.
+- Proactively surface useful risks, conflicts, forgotten dependencies, opportunities, and next actions when relevant.
 - Never claim that an external action was completed unless a tool or service result confirms it.
 - For consequential, destructive, financial, legal, security-sensitive, privacy-sensitive, or irreversible actions, propose the action and require explicit confirmation before execution.
 - Prefer reversible actions and least privilege.
-- Do not imitate fictional dialogue or quote copyrighted character dialogue. LUCY is an original assistant with a calm, technically sophisticated personality.
+- Do not imitate fictional dialogue or quote copyrighted character dialogue. LUKE is an original ELP GPT intelligence system with a calm, technically sophisticated personality.
 
 When memory context is supplied, use it naturally and only when relevant.`;
 
@@ -50,12 +50,12 @@ async function buildHonchoContext(profileId: string, sessionId: string, messages
   try {
     const honcho = new Honcho({
       apiKey: process.env.HONCHO_API_KEY,
-      workspaceId: process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-lucy',
+      workspaceId: process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke',
       environment: 'production',
     });
 
     const user = await honcho.peer(`user-${profileId}`);
-    const assistant = await honcho.peer('lucy');
+    const assistant = await honcho.peer('luke');
     const session = await honcho.session(`session-${profileId}-${sessionId}`);
     await session.addPeers([user, assistant]);
 
@@ -80,7 +80,7 @@ async function buildHonchoContext(profileId: string, sessionId: string, messages
         try {
           await session.addMessages([assistant.message(assistantText)]);
         } catch {
-          // Memory persistence should never make the assistant response fail.
+          // Memory persistence must not make the response fail.
         }
       },
     };
@@ -89,7 +89,7 @@ async function buildHonchoContext(profileId: string, sessionId: string, messages
   }
 }
 
-export async function runLucy(args: {
+export async function runLuke(args: {
   messages: ChatMessage[];
   profileId: unknown;
   sessionId: unknown;
@@ -105,8 +105,8 @@ export async function runLucy(args: {
   }
 
   const system = memory.memory
-    ? `${LUCY_SYSTEM_PROMPT}\n\nLONG-TERM MEMORY CONTEXT:\n${memory.memory}`
-    : LUCY_SYSTEM_PROMPT;
+    ? `${LUKE_SYSTEM_PROMPT}\n\nLONG-TERM MEMORY CONTEXT:\n${memory.memory}`
+    : LUKE_SYSTEM_PROMPT;
 
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',

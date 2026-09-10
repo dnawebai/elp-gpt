@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runLucy } from '@/lib/lucy';
+import { runLuke } from '@/lib/luke';
 
 export const runtime = 'nodejs';
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'The last message must be from the user.' }, { status: 400 });
     }
 
-    const result = await runLucy({
+    const result = await runLuke({
       messages,
       profileId: body.profileId,
       sessionId: body.sessionId,
@@ -45,9 +45,9 @@ export async function POST(request: Request) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
-    console.error('LUCY chat error', error);
+    console.error('LUKE chat error', error);
     return NextResponse.json(
-      { error: 'LUCY is temporarily unavailable. Verify the configured model provider.' },
+      { error: 'LUKE is temporarily unavailable. Verify the configured model provider.' },
       { status: 502 },
     );
   }

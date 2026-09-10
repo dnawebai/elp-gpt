@@ -1,108 +1,67 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Bell,
   BrainCircuit,
-  CalendarClock,
   ChevronRight,
   CircleUserRound,
-  Command,
+  Cpu,
   Mic,
-  MicOff,
-  Orbit,
-  Search,
-  Send,
+  Radio,
   ShieldCheck,
-  Sparkles,
-  Volume2,
-  VolumeX,
   WandSparkles,
-  Zap,
+  X,
 } from 'lucide-react';
-import { useLucyVoice } from '@/lib/useLucyVoice';
+import { useLukeVoice } from '@/lib/useLukeVoice';
 
 type Role = 'user' | 'assistant';
-type Message = { role: Role; content: string };
-type Suggestion = { title: string; detail: string; icon: 'calendar' | 'audit' | 'focus' };
+type VoiceMessage = { role: Role; content: string };
 
-const starterMessages: Message[] = [
-  {
-    role: 'assistant',
-    content:
-      "I'm LUCY. I can help you think, plan, research, remember preferences, monitor priorities and prepare actions. I’ll ask before executing sensitive or irreversible actions.",
-  },
+type SystemItem = {
+  label: string;
+  detail: string;
+  icon: 'memory' | 'signals' | 'skills' | 'briefings' | 'permissions' | 'system';
+};
+
+const systemItems: SystemItem[] = [
+  { label: 'Memory', detail: 'Profile understanding and long-term context', icon: 'memory' },
+  { label: 'Signals', detail: 'Changes, risks, priorities and opportunities', icon: 'signals' },
+  { label: 'Skills', detail: 'Connected capabilities and agent tools', icon: 'skills' },
+  { label: 'Briefings', detail: 'Scheduled and proactive intelligence', icon: 'briefings' },
+  { label: 'Permissions', detail: 'Approvals, privacy and action controls', icon: 'permissions' },
+  { label: 'System', detail: 'Voice, models, integrations and diagnostics', icon: 'system' },
 ];
 
-const suggestions: Suggestion[] = [
-  {
-    title: 'Daily command brief',
-    detail: 'Summarize priorities, meetings, risks and follow-ups into one concise briefing.',
-    icon: 'focus',
-  },
-  {
-    title: 'Proactive audit',
-    detail: 'Review connected projects and surface broken workflows, security risks and optimization opportunities.',
-    icon: 'audit',
-  },
-  {
-    title: 'Calendar intelligence',
-    detail: 'Prepare before meetings and identify schedule conflicts, follow-ups and missing prep.',
-    icon: 'calendar',
-  },
-];
-
-function SuggestionIcon({ kind }: { kind: Suggestion['icon'] }) {
-  if (kind === 'calendar') return <CalendarClock size={18} />;
-  if (kind === 'audit') return <ShieldCheck size={18} />;
-  return <Zap size={18} />;
+function SystemIcon({ kind }: { kind: SystemItem['icon'] }) {
+  if (kind === 'memory') return <BrainCircuit size={19} />;
+  if (kind === 'signals') return <Activity size={19} />;
+  if (kind === 'skills') return <WandSparkles size={19} />;
+  if (kind === 'briefings') return <Bell size={19} />;
+  if (kind === 'permissions') return <ShieldCheck size={19} />;
+  return <Cpu size={19} />;
 }
 
 export default function Home() {
-  const [messages, setMessages] = useState<Message[]>(starterMessages);
-  const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [profileId] = useState(() => {
-    if (typeof window === 'undefined') return 'anonymous';
-    const existing = window.localStorage.getItem('lucy-profile-id');
-    if (existing) return existing;
-    const created = crypto.randomUUID();
-    window.localStorage.setItem('lucy-profile-id', created);
-    return created;
-  });
-  const [sessionId] = useState(() => {
-    if (typeof window === 'undefined') return 'web';
-    const existing = window.sessionStorage.getItem('lucy-session-id');
-    if (existing) return existing;
-    const created = crypto.randomUUID();
-    window.sessionStorage.setItem('lucy-session-id', created);
-    return created;
-  });
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [latestVoice, setLatestVoice] = useState<VoiceMessage | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
-  const onVoiceMessage = useCallback((message: Message) => {
-    setMessages((current) => {
-      const last = current[current.length - 1];
-      if (last?.role === message.role && last.content === message.content) return current;
-      return [...current, message];
-    });
+  const onVoiceMessage = useCallback((message: VoiceMessage) => {
+    setLatestVoice(message);
+    setVoiceError(null);
   }, []);
 
-  const onVoiceError = useCallback((content: string) => {
-    setMessages((current) => [...current, { role: 'assistant', content }]);
+  const onVoiceError = useCallback((message: string) => {
+    setVoiceError(message);
   }, []);
 
-  const voice = useLucyVoice({
-    enabled: voiceEnabled,
+  const voice = useLukeVoice({
+    enabled: true,
     onMessage: onVoiceMessage,
     onError: onVoiceError,
   });
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, busy]);
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -110,199 +69,125 @@ export default function Home() {
     }
   }, []);
 
-  const status = useMemo(() => {
-    if (voice.isSpeaking) return 'Speaking';
-    if (voice.isListening) return 'Listening';
-    if (voice.state === 'connecting') return 'Connecting';
-    if (busy) return 'Thinking';
-    return 'Ready';
-  }, [busy, voice.isListening, voice.isSpeaking, voice.state]);
+  const stateLabel = useMemo(() => {
+    if (voice.state === 'connecting') return 'CONNECTING';
+    if (voice.isSpeaking) return 'SPEAKING';
+    if (voice.isListening) return 'LISTENING';
+    if (voice.state === 'error') return 'VOICE OFFLINE';
+    return 'TAP TO ACTIVATE';
+  }, [voice.isListening, voice.isSpeaking, voice.state]);
 
-  async function send(content = input) {
-    const text = content.trim();
-    if (!text || busy) return;
-
-    const nextMessages = [...messages, { role: 'user' as const, content: text }];
-    setMessages(nextMessages);
-    setInput('');
-    setBusy(true);
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: nextMessages, profileId, sessionId }),
-      });
-
-      if (!response.ok) throw new Error('Assistant request failed');
-      const data = (await response.json()) as { message?: string };
-      const answer = data.message || 'I received the request, but the model returned an empty response.';
-      setMessages((current) => [...current, { role: 'assistant', content: answer }]);
-
-      if (voiceEnabled && !voice.isActive && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(answer);
-        utterance.rate = 1.02;
-        window.speechSynthesis.speak(utterance);
-      }
-    } catch {
-      setMessages((current) => [
-        ...current,
-        {
-          role: 'assistant',
-          content:
-            'I cannot reach the configured reasoning provider yet. Check your server environment variables for Together AI or Hermes, then try again.',
-        },
-      ]);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const activeLabel = voice.isActive ? 'ACTIVE' : voice.state === 'error' ? 'CHECK VOICE' : 'STANDBY';
 
   function toggleVoice() {
-    if (voice.isActive) {
-      voice.stop();
-    } else {
-      void voice.start();
-    }
+    setVoiceError(null);
+    if (voice.isActive) voice.stop();
+    else void voice.start();
   }
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar glass">
-        <div className="brand-row">
-          <div className="brand-mark"><Orbit size={23} /></div>
-          <div><strong>LUCY</strong><span>ELP GPT</span></div>
+    <main className="luke-shell">
+      <div className="ambient ambient-one" />
+      <div className="ambient ambient-two" />
+
+      <button
+        className="profile-trigger"
+        onClick={() => setProfileOpen(true)}
+        aria-label="Open profile and system tools"
+      >
+        <CircleUserRound size={24} />
+      </button>
+
+      <section className="voice-stage" aria-label="LUKE voice interface">
+        <button
+          className={`hud ${voice.isActive ? 'is-active' : ''} ${voice.isSpeaking ? 'is-speaking' : ''}`}
+          onClick={toggleVoice}
+          aria-label={voice.isActive ? 'Stop LUKE voice session' : 'Activate LUKE voice session'}
+        >
+          <span className="hud-halo" />
+          <span className="hud-ring ring-outer" />
+          <span className="hud-ring ring-arc-a" />
+          <span className="hud-ring ring-arc-b" />
+          <span className="hud-ring ring-ticks" />
+          <span className="hud-ring ring-inner" />
+          <span className="hud-center">
+            <span className="voice-wave" aria-hidden="true">
+              <i /><i /><i /><i /><i /><i /><i />
+            </span>
+            <strong>LUKE</strong>
+            <span className="voice-state">
+              <Mic size={14} />
+              {stateLabel}
+            </span>
+          </span>
+        </button>
+
+        <div className={`active-state ${voice.isActive ? 'online' : ''}`}>
+          <i />
+          <span>{activeLabel}</span>
         </div>
 
-        <nav className="nav-stack" aria-label="Primary navigation">
-          <button className="nav-item active"><Command size={18} /><span>Command Center</span></button>
-          <button className="nav-item"><BrainCircuit size={18} /><span>Memory</span></button>
-          <button className="nav-item"><Activity size={18} /><span>Signals</span></button>
-          <button className="nav-item"><WandSparkles size={18} /><span>Skills</span></button>
-          <button className="nav-item"><Bell size={18} /><span>Briefings</span></button>
-        </nav>
+        {voiceError && <p className="voice-error">{voiceError}</p>}
+      </section>
 
-        <div className="sidebar-spacer" />
-        <div className="privacy-card">
-          <ShieldCheck size={18} />
-          <div><strong>Permission-first</strong><span>Actions remain reviewable.</span></div>
-        </div>
-        <button className="profile-row"><CircleUserRound size={20} /><span>Your profile</span><ChevronRight size={16} /></button>
-      </aside>
+      <p className="system-signature">ELP GPT</p>
 
-      <section className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">PERSONAL INTELLIGENCE SYSTEM</p>
-            <h1>Good afternoon. <span>What are we solving?</span></h1>
-          </div>
-          <div className="top-actions">
-            <button className="icon-button" aria-label="Search"><Search size={19} /></button>
-            <button
-              className="icon-button"
-              onClick={() => {
-                if (voice.isActive) voice.stop();
-                setVoiceEnabled((value) => !value);
-              }}
-              aria-label="Toggle voice"
-            >
-              {voiceEnabled ? <Volume2 size={19} /> : <VolumeX size={19} />}
-            </button>
-            <div className="status-pill"><i className={busy || voice.isActive ? 'pulse' : ''} />{status}</div>
-          </div>
-        </header>
-
-        <div className="content-grid">
-          <section className="chat-panel glass">
-            <div className="orb-wrap" aria-hidden="true">
-              <div className={voice.isActive || busy ? 'lucy-orb active' : 'lucy-orb'}>
-                <div className="orb-core"><Sparkles size={26} /></div>
+      {profileOpen && (
+        <div className="profile-backdrop" role="presentation" onClick={() => setProfileOpen(false)}>
+          <aside className="profile-panel" role="dialog" aria-modal="true" aria-label="Profile and system" onClick={(event) => event.stopPropagation()}>
+            <header className="profile-header">
+              <div>
+                <p>ELP GPT</p>
+                <h2>Profile & System</h2>
               </div>
-              <div className="orb-label">
-                {voice.isSpeaking
-                  ? 'LUCY IS SPEAKING'
-                  : voice.isListening
-                    ? 'LUCY IS LISTENING'
-                    : busy
-                      ? 'LUCY IS THINKING'
-                      : 'LUCY ONLINE'}
-              </div>
-            </div>
+              <button className="close-button" onClick={() => setProfileOpen(false)} aria-label="Close profile">
+                <X size={21} />
+              </button>
+            </header>
 
-            <div className="messages" aria-live="polite">
-              {messages.map((message, index) => (
-                <article key={`${message.role}-${index}`} className={`message ${message.role}`}>
-                  <span>{message.role === 'assistant' ? 'LUCY' : 'YOU'}</span>
-                  <p>{message.content}</p>
-                </article>
+            <section className="profile-identity">
+              <div className="profile-avatar"><CircleUserRound size={30} /></div>
+              <div>
+                <strong>LUKE profile</strong>
+                <span>Voice intelligence environment</span>
+              </div>
+              <div className="profile-online"><i /> {voice.isActive ? 'Live' : 'Ready'}</div>
+            </section>
+
+            <nav className="system-menu" aria-label="LUKE system tools">
+              {systemItems.map((item) => (
+                <button key={item.label} className="system-row">
+                  <span className="system-row-icon"><SystemIcon kind={item.icon} /></span>
+                  <span className="system-row-copy">
+                    <strong>{item.label}</strong>
+                    <small>{item.detail}</small>
+                  </span>
+                  <ChevronRight size={18} />
+                </button>
               ))}
-              {busy && <article className="message assistant"><span>LUCY</span><p className="thinking-dots">Analyzing<span>...</span></p></article>}
-              <div ref={bottomRef} />
-            </div>
+            </nav>
 
-            <div className="composer-wrap">
-              <div className="composer">
-                <button
-                  className={voice.isActive ? 'mic-button active' : 'mic-button'}
-                  onClick={toggleVoice}
-                  disabled={!voiceEnabled}
-                  aria-label={voice.isActive ? 'Stop realtime voice' : 'Start realtime voice'}
-                >
-                  {voice.isActive ? <MicOff size={20} /> : <Mic size={20} />}
-                </button>
-                <textarea
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault();
-                      void send();
-                    }
-                  }}
-                  rows={1}
-                  placeholder="Ask LUCY anything, or give her a goal..."
-                />
-                <button className="send-button" onClick={() => void send()} disabled={!input.trim() || busy} aria-label="Send">
-                  <Send size={18} />
-                </button>
-              </div>
-              <p className="composer-hint">Enter to send · Mic for realtime conversation · Sensitive actions require approval</p>
-            </div>
-          </section>
-
-          <aside className="insight-rail">
-            <section className="rail-card glass">
-              <div className="rail-heading"><span><BrainCircuit size={17} /> Understanding you</span><b>LEARNING</b></div>
-              <div className="learning-meter"><i style={{ width: '24%' }} /></div>
-              <p>LUCY builds a durable preference model from conversations and approved connected context.</p>
-            </section>
-
-            <section className="rail-card glass">
-              <div className="rail-heading"><span><Sparkles size={17} /> Suggested next</span></div>
-              <div className="suggestion-stack">
-                {suggestions.map((suggestion) => (
-                  <button key={suggestion.title} onClick={() => void send(suggestion.title)} className="suggestion">
-                    <i><SuggestionIcon kind={suggestion.icon} /></i>
-                    <div><strong>{suggestion.title}</strong><span>{suggestion.detail}</span></div>
-                    <ChevronRight size={16} />
-                  </button>
-                ))}
+            <section className="engine-card">
+              <div className="engine-title"><Radio size={17} /><span>Core engines</span></div>
+              <div className="engine-grid">
+                <span>Deepgram <i /></span>
+                <span>Hermes Agent <i /></span>
+                <span>Together AI <i /></span>
+                <span>Honcho Memory <i /></span>
               </div>
             </section>
 
-            <section className="rail-card capability-card glass">
-              <div className="rail-heading"><span><Zap size={17} /> Capability engine</span></div>
-              <div className="capability-list">
-                <span><i /> Together AI reasoning</span>
-                <span><i /> Hermes agent runtime</span>
-                <span><i /> Honcho long-term memory</span>
-                <span><i /> Deepgram realtime voice</span>
-              </div>
-            </section>
+            {latestVoice && (
+              <section className="recent-voice">
+                <span>{latestVoice.role === 'user' ? 'LAST HEARD' : 'LAST RESPONSE'}</span>
+                <p>{latestVoice.content}</p>
+              </section>
+            )}
+
+            <p className="profile-footnote">Tools and controls stay hidden here until you open your profile.</p>
           </aside>
         </div>
-      </section>
+      )}
     </main>
   );
 }
