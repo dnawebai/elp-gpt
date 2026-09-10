@@ -21,10 +21,18 @@ export type DeepgramRuntimeConfig = {
   managedThinkModel: string;
 };
 
+const FLUX_SPEEDS = [0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15] as const;
+
 function boundedNumber(value: string | undefined, fallback: number, min: number, max: number) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, parsed));
+}
+
+function nearestFluxSpeed(value: number) {
+  return FLUX_SPEEDS.reduce((best, candidate) =>
+    Math.abs(candidate - value) < Math.abs(best - value) ? candidate : best,
+  );
 }
 
 function csv(value: string | undefined, fallback: string[]) {
@@ -43,6 +51,8 @@ function normalizeHttpBase(value: string | undefined) {
 export function getDeepgramRuntimeConfig(): DeepgramRuntimeConfig {
   const listenModel = process.env.LUKE_LISTEN_MODEL || 'flux-general-multi';
   const voiceModel = process.env.LUKE_VOICE_MODEL || 'flux-cliff-en';
+  const isFluxVoice = voiceModel.startsWith('flux-');
+  const requestedSpeed = boundedNumber(process.env.LUKE_VOICE_SPEED, 1, 0.7, 1.5);
 
   return {
     apiBaseUrl: normalizeHttpBase(process.env.DEEPGRAM_API_URL),
@@ -50,14 +60,21 @@ export function getDeepgramRuntimeConfig(): DeepgramRuntimeConfig {
     listenModel,
     listenVersion: listenModel.startsWith('flux-') ? 'v2' : 'v1',
     languageHints: csv(process.env.LUKE_LISTEN_LANGUAGE_HINTS, ['en', 'pt']),
-    keyterms: csv(process.env.LUKE_LISTEN_KEYTERMS, ['LUKE', 'ELP GPT', 'Deepgram', 'Hermes', 'Honcho', 'Together AI']),
-    eotThreshold: boundedNumber(process.env.LUKE_EOT_THRESHOLD, 0.78, 0.5, 1),
+    keyterms: csv(process.env.LUKE_LISTEN_KEYTERMS, [
+      'LUKE',
+      'ELP GPT',
+      'Deepgram',
+      'Hermes',
+      'Honcho',
+      'Together AI',
+    ]),
+    eotThreshold: boundedNumber(process.env.LUKE_EOT_THRESHOLD, 0.78, 0.5, 0.9),
     eagerEotThreshold: boundedNumber(process.env.LUKE_EAGER_EOT_THRESHOLD, 0.5, 0.3, 0.9),
     eotTimeoutMs: Math.round(boundedNumber(process.env.LUKE_EOT_TIMEOUT_MS, 2600, 500, 10000)),
     voiceModel,
-    speakVersion: voiceModel.startsWith('flux-') ? 'v2' : 'v1',
-    voiceSpeed: boundedNumber(process.env.LUKE_VOICE_SPEED, 1, 0.7, 1.5),
-    managedThinkModel: process.env.LUKE_DEEPGRAM_MANAGED_LLM_MODEL || 'gpt-5.4-mini',
+    speakVersion: isFluxVoice ? 'v2' : 'v1',
+    voiceSpeed: isFluxVoice ? nearestFluxSpeed(requestedSpeed) : requestedSpeed,
+    managedThinkModel: process.env.LUKE_DEEPGRAM_MANAGED_LLM_MODEL || 'gpt-5-mini',
   };
 }
 
