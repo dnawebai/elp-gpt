@@ -2,14 +2,14 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: 'LUCY — ELP GPT',
-  description: 'A personal AI assistant that learns, reasons, speaks and acts with your permission.',
-  applicationName: 'LUCY',
+  title: 'LUKE — ELP GPT',
+  description: 'A voice-first intelligence system that learns, reasons, speaks and acts with permission.',
+  applicationName: 'LUKE',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'LUCY',
+    title: 'LUKE',
   },
 };
 
@@ -17,7 +17,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#050914',
+  themeColor: '#010813',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
