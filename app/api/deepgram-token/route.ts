@@ -1,30 +1,11 @@
+import { grantDeepgramToken } from '@/lib/deepgram';
+
 export const runtime = 'nodejs';
 
 async function grant() {
-  const apiKey = process.env.DEEPGRAM_API_KEY;
-  if (!apiKey) return new Response('Deepgram is not configured.', { status: 503 });
-
   try {
-    const response = await fetch('https://api.deepgram.com/v1/auth/grant', {
-      method: 'POST',
-      headers: {
-        Authorization: `Token ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ ttl_seconds: 300 }),
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      console.error('Deepgram token grant failed', response.status, detail.slice(0, 200));
-      return new Response('Voice token unavailable.', { status: 502 });
-    }
-
-    const token = (await response.json()) as { access_token?: string };
-    if (!token.access_token) return new Response('Invalid voice token response.', { status: 502 });
-
-    return new Response(token.access_token, {
+    const { accessToken } = await grantDeepgramToken(300);
+    return new Response(accessToken, {
       status: 200,
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
@@ -32,8 +13,10 @@ async function grant() {
       },
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Voice service unavailable.';
+    const status = message.includes('not configured') ? 503 : 502;
     console.error('Deepgram token error', error);
-    return new Response('Voice service unavailable.', { status: 502 });
+    return new Response(message, { status });
   }
 }
 
