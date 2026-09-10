@@ -17,13 +17,13 @@ export async function POST(request: Request) {
   if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as { proposalToken?: unknown; sessionId?: unknown } | null;
-  const sessionId = sanitizeId(body?.sessionId, 'web');
   const proposal = verifyActionToken(typeof body?.proposalToken === 'string' ? body.proposalToken : undefined);
+  const suppliedSession = typeof body?.sessionId === 'string' ? sanitizeId(body.sessionId, 'web') : null;
   if (
     !proposal ||
     proposal.stage !== 'proposal' ||
     proposal.profileId !== profile.profileId ||
-    proposal.sessionId !== sessionId
+    (suppliedSession && proposal.sessionId !== suppliedSession)
   ) {
     return NextResponse.json({ error: 'Invalid or expired action proposal.' }, { status: 401 });
   }
