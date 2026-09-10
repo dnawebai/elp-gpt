@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   Bell,
@@ -21,6 +21,7 @@ import {
   WandSparkles,
   Zap,
 } from 'lucide-react';
+import { useLucyVoice } from '@/lib/useLucyVoice';
 
 type Role = 'user' | 'assistant';
 type Message = { role: Role; content: string };
@@ -62,7 +63,6 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>(starterMessages);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const [listening, setListening] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [profileId] = useState(() => {
     if (typeof window === 'undefined') return 'anonymous';
@@ -82,6 +82,24 @@ export default function Home() {
   });
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const onVoiceMessage = useCallback((message: Message) => {
+    setMessages((current) => {
+      const last = current[current.length - 1];
+      if (last?.role === message.role && last.content === message.content) return current;
+      return [...current, message];
+    });
+  }, []);
+
+  const onVoiceError = useCallback((content: string) => {
+    setMessages((current) => [...current, { role: 'assistant', content }]);
+  }, []);
+
+  const voice = useLucyVoice({
+    enabled: voiceEnabled,
+    onMessage: onVoiceMessage,
+    onError: onVoiceError,
+  });
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, busy]);
@@ -92,7 +110,13 @@ export default function Home() {
     }
   }, []);
 
-  const status = useMemo(() => (busy ? 'Thinking' : listening ? 'Listening' : 'Ready'), [busy, listening]);
+  const status = useMemo(() => {
+    if (voice.isSpeaking) return 'Speaking';
+    if (voice.isListening) return 'Listening';
+    if (voice.state === 'connecting') return 'Connecting';
+    if (busy) return 'Thinking';
+    return 'Ready';
+  }, [busy, voice.isListening, voice.isSpeaking, voice.state]);
 
   async function send(content = input) {
     const text = content.trim();
@@ -115,7 +139,7 @@ export default function Home() {
       const answer = data.message || 'I received the request, but the model returned an empty response.';
       setMessages((current) => [...current, { role: 'assistant', content: answer }]);
 
-      if (voiceEnabled && 'speechSynthesis' in window) {
+      if (voiceEnabled && !voice.isActive && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(answer);
         utterance.rate = 1.02;
@@ -135,28 +159,11 @@ export default function Home() {
     }
   }
 
-  async function toggleListening() {
-    if (listening) {
-      setListening(false);
-      return;
-    }
-
-    setListening(true);
-    try {
-      const response = await fetch('/api/deepgram-token', { method: 'POST' });
-      if (!response.ok) throw new Error('Voice unavailable');
-      // The server-side token path is intentionally established now. The next voice milestone
-      // attaches Deepgram Voice Agent streaming directly to this state machine.
-      window.setTimeout(() => setListening(false), 1200);
-    } catch {
-      setListening(false);
-      setMessages((current) => [
-        ...current,
-        {
-          role: 'assistant',
-          content: 'Voice is not configured yet. Add DEEPGRAM_API_KEY to the deployment environment.',
-        },
-      ]);
+  function toggleVoice() {
+    if (voice.isActive) {
+      voice.stop();
+    } else {
+      void voice.start();
     }
   }
 
@@ -192,20 +199,35 @@ export default function Home() {
           </div>
           <div className="top-actions">
             <button className="icon-button" aria-label="Search"><Search size={19} /></button>
-            <button className="icon-button" onClick={() => setVoiceEnabled((value) => !value)} aria-label="Toggle spoken responses">
+            <button
+              className="icon-button"
+              onClick={() => {
+                if (voice.isActive) voice.stop();
+                setVoiceEnabled((value) => !value);
+              }}
+              aria-label="Toggle voice"
+            >
               {voiceEnabled ? <Volume2 size={19} /> : <VolumeX size={19} />}
             </button>
-            <div className="status-pill"><i className={busy ? 'pulse' : ''} />{status}</div>
+            <div className="status-pill"><i className={busy || voice.isActive ? 'pulse' : ''} />{status}</div>
           </div>
         </header>
 
         <div className="content-grid">
           <section className="chat-panel glass">
             <div className="orb-wrap" aria-hidden="true">
-              <div className={listening || busy ? 'lucy-orb active' : 'lucy-orb'}>
+              <div className={voice.isActive || busy ? 'lucy-orb active' : 'lucy-orb'}>
                 <div className="orb-core"><Sparkles size={26} /></div>
               </div>
-              <div className="orb-label">{listening ? 'LUCY IS LISTENING' : busy ? 'LUCY IS THINKING' : 'LUCY ONLINE'}</div>
+              <div className="orb-label">
+                {voice.isSpeaking
+                  ? 'LUCY IS SPEAKING'
+                  : voice.isListening
+                    ? 'LUCY IS LISTENING'
+                    : busy
+                      ? 'LUCY IS THINKING'
+                      : 'LUCY ONLINE'}
+              </div>
             </div>
 
             <div className="messages" aria-live="polite">
@@ -221,8 +243,13 @@ export default function Home() {
 
             <div className="composer-wrap">
               <div className="composer">
-                <button className={listening ? 'mic-button active' : 'mic-button'} onClick={toggleListening} aria-label="Voice input">
-                  {listening ? <MicOff size={20} /> : <Mic size={20} />}
+                <button
+                  className={voice.isActive ? 'mic-button active' : 'mic-button'}
+                  onClick={toggleVoice}
+                  disabled={!voiceEnabled}
+                  aria-label={voice.isActive ? 'Stop realtime voice' : 'Start realtime voice'}
+                >
+                  {voice.isActive ? <MicOff size={20} /> : <Mic size={20} />}
                 </button>
                 <textarea
                   value={input}
@@ -240,7 +267,7 @@ export default function Home() {
                   <Send size={18} />
                 </button>
               </div>
-              <p className="composer-hint">Enter to send · Shift + Enter for a new line · Sensitive actions require approval</p>
+              <p className="composer-hint">Enter to send · Mic for realtime conversation · Sensitive actions require approval</p>
             </div>
           </section>
 
