@@ -14,8 +14,28 @@ function getConfig() {
   return { apiKey, baseUrl };
 }
 
+function configuredToolkitAllowlist() {
+  const value = process.env.LUKE_ALLOWED_TOOLKITS?.trim();
+  if (!value) return null;
+  const items = value
+    .split(',')
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+  return items.length ? new Set(items) : null;
+}
+
 export function isComposioConfigured() {
   return Boolean(getConfig().apiKey);
+}
+
+export function isToolkitAllowed(toolSlug: string) {
+  const allowlist = configuredToolkitAllowlist();
+  if (!allowlist) return true;
+  const normalized = toolSlug.trim().toUpperCase();
+  for (const toolkit of allowlist) {
+    if (normalized === toolkit || normalized.startsWith(`${toolkit}_`)) return true;
+  }
+  return false;
 }
 
 async function request(path: string, init?: RequestInit) {
@@ -52,12 +72,15 @@ async function request(path: string, init?: RequestInit) {
 }
 
 export async function searchComposioTools(query: string, toolkit?: string) {
+  const normalizedToolkit = toolkit?.trim().toUpperCase();
+  if (normalizedToolkit && !isToolkitAllowed(`${normalizedToolkit}_TOOL`)) return [];
+
   const params = new URLSearchParams({
     search: query.slice(0, 300),
     limit: '6',
     toolkit_versions: 'latest',
   });
-  if (toolkit) params.set('toolkits', toolkit.toUpperCase());
+  if (normalizedToolkit) params.set('toolkits', normalizedToolkit);
 
   const data = (await request(`/tools?${params.toString()}`)) as {
     items?: Array<Record<string, unknown>>;
@@ -65,7 +88,7 @@ export async function searchComposioTools(query: string, toolkit?: string) {
   };
   const items = data.items || data.tools || [];
 
-  return items.slice(0, 6).map((item): ComposioToolSummary => ({
+  return items.slice(0, 12).map((item): ComposioToolSummary => ({
     slug: String(item.slug || item.name || ''),
     name: String(item.name || item.slug || ''),
     description: String(item.description || ''),
@@ -76,7 +99,7 @@ export async function searchComposioTools(query: string, toolkit?: string) {
         : item.input_schema && typeof item.input_schema === 'object'
           ? (item.input_schema as Record<string, unknown>)
           : undefined,
-  })).filter((tool) => tool.slug);
+  })).filter((tool) => tool.slug && isToolkitAllowed(tool.slug)).slice(0, 6);
 }
 
 export async function executeComposioTool(args: {
@@ -85,6 +108,10 @@ export async function executeComposioTool(args: {
   profileId: string;
   connectedAccountId?: string;
 }) {
+  if (!isToolkitAllowed(args.toolSlug)) {
+    throw new Error('This toolkit is not allowed by the current LUKE deployment policy.');
+  }
+
   const body: Record<string, unknown> = {
     arguments: args.arguments,
     user_id: args.profileId,
