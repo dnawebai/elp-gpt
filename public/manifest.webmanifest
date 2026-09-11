@@ -1,11 +1,27 @@
 {
+  "id": "/",
   "name": "LUKE — ELP GPT",
   "short_name": "LUKE",
   "description": "Voice-first intelligence system",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#010813",
   "theme_color": "#010813",
   "orientation": "any",
-  "categories": ["productivity", "utilities"]
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
