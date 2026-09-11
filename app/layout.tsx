@@ -1,8 +1,10 @@
 import './globals.css';
 import './profile.css';
 import './neural-vortex.css';
+import './install-prompt.css';
 import type { Metadata, Viewport } from 'next';
 import NeuralVortexBackdrop from './NeuralVortexBackdrop';
+import InstallAppPrompt from './InstallAppPrompt';
 
 export const metadata: Metadata = {
   title: 'LUKE — ELP GPT',
@@ -29,6 +31,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <NeuralVortexBackdrop />
         {children}
+        <InstallAppPrompt />
       </body>
     </html>
   );
