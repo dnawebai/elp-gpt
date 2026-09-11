@@ -3,7 +3,7 @@
   --nv-y: 0;
   position: fixed;
   inset: 0;
-  z-index: -20;
+  z-index: 0;
   overflow: hidden;
   pointer-events: none;
   background: #00070a;
@@ -72,6 +72,7 @@
 }
 
 .luke-shell {
+  z-index: 1;
   background: transparent !important;
 }
 
