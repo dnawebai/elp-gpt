@@ -1,4 +1,4 @@
-const CACHE = 'lucy-shell-v1';
+const CACHE = 'elp-gpt-shell-v2';
 const SHELL = ['/', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
