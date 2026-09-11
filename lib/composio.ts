@@ -8,7 +8,7 @@ export type ComposioToolSummary = {
   inputSchema?: Record<string, unknown>;
 };
 
-type ComposioIdentityMode = 'profile' | 'owner';
+type ComposioIdentityMode = 'profile' | 'owner-user' | 'owner-accounts';
 
 function getConfig() {
   const apiKey = process.env.COMPOSIO_API_KEY?.trim();
@@ -34,23 +34,54 @@ function configuredOwnerUserId() {
   return process.env.LUKE_COMPOSIO_OWNER_USER_ID?.trim() || null;
 }
 
+function configuredOwnerAccountBindings() {
+  const raw = process.env.LUKE_COMPOSIO_OWNER_ACCOUNT_BINDINGS?.trim();
+  const bindings = new Map<string, string>();
+  if (!raw) return bindings;
+
+  for (const entry of raw.split(',')) {
+    const separator = entry.indexOf('=');
+    if (separator <= 0) continue;
+    const toolkit = entry.slice(0, separator).trim().toUpperCase();
+    const connectedAccountId = entry.slice(separator + 1).trim();
+    if (toolkit && connectedAccountId) bindings.set(toolkit, connectedAccountId);
+  }
+  return bindings;
+}
+
+function resolveOwnerConnectedAccountId(toolSlug: string) {
+  if (!isOwnerModeEnabled()) return null;
+  const normalized = toolSlug.trim().toUpperCase();
+  const bindings = configuredOwnerAccountBindings();
+  const matchingToolkit = [...bindings.keys()]
+    .filter((toolkit) => normalized === toolkit || normalized.startsWith(`${toolkit}_`))
+    .sort((a, b) => b.length - a.length)[0];
+  return matchingToolkit ? bindings.get(matchingToolkit) || null : null;
+}
+
 export function getComposioIdentityMode(): ComposioIdentityMode {
-  return isOwnerModeEnabled() && configuredOwnerUserId() ? 'owner' : 'profile';
+  if (!isOwnerModeEnabled()) return 'profile';
+  if (configuredOwnerAccountBindings().size > 0) return 'owner-accounts';
+  if (configuredOwnerUserId()) return 'owner-user';
+  return 'profile';
 }
 
 export function getComposioExecutionUserId(profileId: string) {
-  if (getComposioIdentityMode() === 'owner') return configuredOwnerUserId() as string;
+  if (getComposioIdentityMode() === 'owner-user') return configuredOwnerUserId() as string;
   return profileId;
 }
 
 export function getComposioIdentityHealth() {
   const singleUserMode = isOwnerModeEnabled();
   const ownerUserConfigured = Boolean(configuredOwnerUserId());
+  const bindings = configuredOwnerAccountBindings();
   return {
     mode: getComposioIdentityMode(),
     singleUserMode,
     ownerUserConfigured,
-    ready: !singleUserMode || ownerUserConfigured,
+    boundToolkits: [...bindings.keys()].sort(),
+    bindingCount: bindings.size,
+    ready: !singleUserMode || ownerUserConfigured || bindings.size > 0,
   };
 }
 
@@ -145,16 +176,27 @@ export async function executeComposioTool(args: {
   const identityHealth = getComposioIdentityHealth();
   if (!identityHealth.ready) {
     throw new Error(
-      'LUKE_SINGLE_USER_MODE is enabled but LUKE_COMPOSIO_OWNER_USER_ID is missing. Refusing to execute with an ambiguous Composio identity.',
+      'LUKE_SINGLE_USER_MODE is enabled but no Composio owner user or connected-account bindings are configured. Refusing ambiguous execution.',
     );
   }
 
+  const connectedAccountId = args.connectedAccountId || resolveOwnerConnectedAccountId(args.toolSlug);
+  const ownerUserId = configuredOwnerUserId();
   const body: Record<string, unknown> = {
     arguments: args.arguments,
-    user_id: getComposioExecutionUserId(args.profileId),
     version: 'latest',
   };
-  if (args.connectedAccountId) body.connected_account_id = args.connectedAccountId;
+
+  if (connectedAccountId) {
+    body.connected_account_id = connectedAccountId;
+  }
+
+  // For an explicitly bound authenticated account, Composio can resolve auth by
+  // connected_account_id alone. Omitting a mismatched user_id prevents private
+  // account scoping failures. No-auth tools still receive a profile/user ID.
+  if (!connectedAccountId || ownerUserId) {
+    body.user_id = ownerUserId || args.profileId;
+  }
 
   return request(`/tools/execute/${encodeURIComponent(args.toolSlug)}`, {
     method: 'POST',
