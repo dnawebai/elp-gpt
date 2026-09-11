@@ -8,6 +8,8 @@ export type ComposioToolSummary = {
   inputSchema?: Record<string, unknown>;
 };
 
+type ComposioIdentityMode = 'profile' | 'owner';
+
 function getConfig() {
   const apiKey = process.env.COMPOSIO_API_KEY?.trim();
   const baseUrl = (process.env.COMPOSIO_API_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
@@ -22,6 +24,34 @@ function configuredToolkitAllowlist() {
     .map((item) => item.trim().toUpperCase())
     .filter(Boolean);
   return items.length ? new Set(items) : null;
+}
+
+function isOwnerModeEnabled() {
+  return process.env.LUKE_SINGLE_USER_MODE?.trim().toLowerCase() === 'true';
+}
+
+function configuredOwnerUserId() {
+  return process.env.LUKE_COMPOSIO_OWNER_USER_ID?.trim() || null;
+}
+
+export function getComposioIdentityMode(): ComposioIdentityMode {
+  return isOwnerModeEnabled() && configuredOwnerUserId() ? 'owner' : 'profile';
+}
+
+export function getComposioExecutionUserId(profileId: string) {
+  if (getComposioIdentityMode() === 'owner') return configuredOwnerUserId() as string;
+  return profileId;
+}
+
+export function getComposioIdentityHealth() {
+  const singleUserMode = isOwnerModeEnabled();
+  const ownerUserConfigured = Boolean(configuredOwnerUserId());
+  return {
+    mode: getComposioIdentityMode(),
+    singleUserMode,
+    ownerUserConfigured,
+    ready: !singleUserMode || ownerUserConfigured,
+  };
 }
 
 export function isComposioConfigured() {
@@ -112,9 +142,16 @@ export async function executeComposioTool(args: {
     throw new Error('This toolkit is not allowed by the current LUKE deployment policy.');
   }
 
+  const identityHealth = getComposioIdentityHealth();
+  if (!identityHealth.ready) {
+    throw new Error(
+      'LUKE_SINGLE_USER_MODE is enabled but LUKE_COMPOSIO_OWNER_USER_ID is missing. Refusing to execute with an ambiguous Composio identity.',
+    );
+  }
+
   const body: Record<string, unknown> = {
     arguments: args.arguments,
-    user_id: args.profileId,
+    user_id: getComposioExecutionUserId(args.profileId),
     version: 'latest',
   };
   if (args.connectedAccountId) body.connected_account_id = args.connectedAccountId;
