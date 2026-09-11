@@ -29,6 +29,12 @@ export default function InstallAppPrompt() {
   const isiOS = useMemo(() => isIOSDevice(), []);
 
   useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((error) => {
+        console.error('ELP GPT service worker registration failed', error);
+      });
+    }
+
     if (isStandalone()) {
       try { window.localStorage.setItem(INSTALLED_KEY, '1'); } catch {}
       return;
