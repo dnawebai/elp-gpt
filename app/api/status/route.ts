@@ -3,6 +3,7 @@ import { isComposioConfigured } from '@/lib/composio';
 import { getDeepgramRuntimeConfig, isDeepgramConfigured, verifyDeepgramConnection } from '@/lib/deepgram';
 import { getReasoningProvider } from '@/lib/luke';
 import { getSecurityMode } from '@/lib/security';
+import { LUKE_SKILLS } from '@/lib/skills';
 
 export const runtime = 'nodejs';
 
@@ -33,6 +34,9 @@ export async function GET(request: Request) {
     listenModel: config.listenModel,
     voiceVersion: config.speakVersion,
     listenVersion: config.listenVersion,
+    skills: LUKE_SKILLS.length,
+    deviceContext: true,
+    preciseLocation: 'permission-required',
   };
 
   return NextResponse.json(status, { headers: { 'Cache-Control': 'no-store' } });
