@@ -1,4 +1,5 @@
 import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
+import { skillsToPrompt } from '@/lib/skills';
 
 export type ChatMessage = {
   role: 'user' | 'assistant' | 'system';
@@ -16,10 +17,19 @@ Operating style:
 - Proactively surface material risks, conflicts, forgotten dependencies, opportunities, and next actions.
 - Distinguish verified facts from inference. Say when something is uncertain.
 - Use available tools when they materially improve the answer.
+- Prefer a direct authenticated API/tool over browser automation. Use browser/computer control only as a fallback.
+- For local requests, use authorized device coordinates when available instead of guessing the user's location.
 - Never claim an external action completed unless a tool result confirms it.
 - For consequential, destructive, financial, legal, security-sensitive, privacy-sensitive, or irreversible actions, require explicit approval before execution.
 - Prefer reversible actions and least privilege.
 - Do not imitate or quote fictional assistants. LUKE is an original ELP GPT system.
+
+Action planning:
+- Identify the smallest skill or combination of skills that can complete the request.
+- For connected apps, discover the exact tool before planning execution; never invent tool slugs or argument names.
+- Read-only actions may run when directly requested and relevant.
+- External writes, communications, bookings, purchases, cancellations, deployments, security changes, and other commitments require the configured approval policy.
+- When an action fails, report the actual failure and the missing dependency rather than pretending it completed.
 
 Voice output rules:
 - Do not speak markdown syntax, URLs character-by-character, tables, or long enumerations unless requested.
@@ -64,9 +74,12 @@ export function getReasoningProvider(): ReasoningProvider | null {
 export async function buildLukeSystemPrompt(profileId: string, sessionId: string) {
   const memory = await getMemorySnapshot(profileId, sessionId);
   const memoryText = memoryToPrompt(memory);
-  return memoryText
-    ? `${LUKE_SYSTEM_PROMPT}\n\nLONG-TERM MEMORY CONTEXT:\n${memoryText}`
-    : LUKE_SYSTEM_PROMPT;
+  const sections = [
+    LUKE_SYSTEM_PROMPT,
+    `AVAILABLE LUKE SKILLS:\n${skillsToPrompt()}`,
+    memoryText ? `LONG-TERM MEMORY CONTEXT:\n${memoryText}` : '',
+  ].filter(Boolean);
+  return sections.join('\n\n');
 }
 
 export async function runLuke(args: {
