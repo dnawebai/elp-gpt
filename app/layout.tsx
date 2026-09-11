@@ -1,6 +1,8 @@
 import './globals.css';
 import './profile.css';
+import './neural-vortex.css';
 import type { Metadata, Viewport } from 'next';
+import NeuralVortexBackdrop from './NeuralVortexBackdrop';
 
 export const metadata: Metadata = {
   title: 'LUKE — ELP GPT',
@@ -24,7 +26,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <NeuralVortexBackdrop />
+        {children}
+      </body>
     </html>
   );
 }
