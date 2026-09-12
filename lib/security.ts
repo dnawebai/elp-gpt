@@ -63,7 +63,7 @@ function verify<T>(token: string | undefined): T | null {
   }
 }
 
-export function createProfileToken(profileId = randomUUID()) {
+export function createProfileToken(profileId: string = randomUUID()) {
   return mint<ProfileClaims>({
     kind: 'profile',
     profileId,
