@@ -1,0 +1,442 @@
+/* Reference HUD redesign — inspired by the supplied cyan/black interface artwork.
+   This file intentionally overrides only the public voice surface; profile/system
+   panels and LUKE's existing voice/action logic remain unchanged. */
+
+:root {
+  --cyan: #00f6ff;
+  --cyan-2: #00bdd2;
+  --blue: #067d98;
+  --text: #eaffff;
+  --muted: #74aab3;
+}
+
+html,
+body {
+  background: #00090b;
+}
+
+body {
+  background:
+    radial-gradient(circle at 50% 52%, rgba(0, 240, 255, .09), transparent 30%),
+    linear-gradient(180deg, #00090b 0%, #001114 48%, #000709 100%);
+}
+
+.luke-shell {
+  background:
+    linear-gradient(135deg, transparent 0 13%, rgba(0, 239, 255, .065) 13.3%, transparent 18%),
+    linear-gradient(315deg, transparent 0 11%, rgba(0, 239, 255, .07) 11.4%, transparent 18%),
+    radial-gradient(circle at 50% 51%, rgba(0, 247, 255, .095) 0 2%, transparent 2.3%),
+    radial-gradient(circle at 50% 51%, transparent 0 14%, rgba(0, 236, 245, .11) 14.2% 14.45%, transparent 14.8%),
+    radial-gradient(circle at 50% 51%, transparent 0 27%, rgba(0, 229, 239, .075) 27.2% 27.45%, transparent 27.8%),
+    radial-gradient(circle at 50% 51%, rgba(0, 124, 141, .16), rgba(0, 23, 28, .08) 38%, transparent 69%),
+    #00090b;
+}
+
+/* Broad diagonal light bands visible in the reference image. */
+.ambient {
+  border-radius: 0;
+  filter: blur(8px);
+  opacity: .72;
+  z-index: -2;
+}
+
+.ambient-one {
+  width: 26vw;
+  height: 150vh;
+  max-width: none;
+  max-height: none;
+  left: -9vw;
+  top: -25vh;
+  transform: rotate(33deg);
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(0, 202, 219, .03) 22%,
+    rgba(0, 243, 255, .20) 47%,
+    rgba(0, 137, 154, .07) 70%,
+    transparent);
+}
+
+.ambient-two {
+  width: 28vw;
+  height: 150vh;
+  right: -8vw;
+  top: -30vh;
+  transform: rotate(32deg);
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(0, 176, 195, .03) 18%,
+    rgba(0, 240, 250, .18) 50%,
+    rgba(0, 123, 141, .07) 76%,
+    transparent);
+}
+
+/* Dense central targeting/circuit field. */
+.luke-shell::before {
+  content: "";
+  position: absolute;
+  width: min(1220px, 145vw);
+  aspect-ratio: 1;
+  height: auto;
+  left: 50%;
+  top: 51%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  opacity: .8;
+  background:
+    repeating-conic-gradient(from 3deg,
+      rgba(0, 244, 255, .11) 0deg .42deg,
+      transparent .42deg 4.2deg),
+    radial-gradient(circle,
+      transparent 0 11%,
+      rgba(0, 243, 255, .35) 11.1% 11.35%,
+      transparent 11.55% 17%,
+      rgba(0, 230, 239, .14) 17.1% 17.35%,
+      transparent 17.55% 25%,
+      rgba(0, 240, 250, .23) 25.1% 25.35%,
+      transparent 25.55% 33%,
+      rgba(0, 204, 218, .13) 33.1% 33.35%,
+      transparent 33.55% 42%,
+      rgba(0, 236, 246, .18) 42.1% 42.38%,
+      transparent 42.58% 51%,
+      rgba(0, 172, 188, .10) 51.1% 51.3%,
+      transparent 51.5% 64%);
+  -webkit-mask: radial-gradient(circle, #000 0 67%, transparent 74%);
+  mask: radial-gradient(circle, #000 0 67%, transparent 74%);
+}
+
+/* Hexagonal/circuit motifs across the field. */
+.luke-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: .34;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='156' viewBox='0 0 180 156'%3E%3Cg fill='none' stroke='%2300e8ef' stroke-opacity='.33' stroke-width='1'%3E%3Cpath d='M30 2 56 17v30L30 62 4 47V17Z'/%3E%3Cpath d='M88 48 114 63v30l-26 15-26-15V63Z'/%3E%3Cpath d='M146 2 172 17v30l-26 15-26-15V17Z'/%3E%3Cpath d='M146 96 172 111v30l-26 15-26-15v-30Z'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(rgba(0, 237, 247, .025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 237, 247, .018) 1px, transparent 1px);
+  background-size: 180px 156px, 72px 72px, 72px 72px;
+  -webkit-mask-image: radial-gradient(circle at 50% 51%, transparent 0 18%, #000 30%, #000 74%, transparent 92%);
+  mask-image: radial-gradient(circle at 50% 51%, transparent 0 18%, #000 30%, #000 74%, transparent 92%);
+}
+
+.profile-trigger {
+  width: 48px;
+  height: 48px;
+  border-color: rgba(0, 239, 250, .42);
+  background: rgba(0, 8, 11, .48);
+  color: #c8fcff;
+  box-shadow: 0 0 22px rgba(0, 227, 240, .15), inset 0 0 18px rgba(0, 227, 240, .05);
+}
+
+.profile-trigger:hover {
+  border-color: rgba(0, 248, 255, .9);
+  box-shadow: 0 0 30px rgba(0, 238, 247, .28), inset 0 0 18px rgba(0, 238, 247, .08);
+}
+
+.voice-stage {
+  width: 100%;
+  min-height: 100dvh;
+  gap: 18px;
+  padding: 5vh 0 4vh;
+}
+
+.hud {
+  --hud-size: min(900px, 94vw, 84vh);
+  min-width: 330px;
+  min-height: 330px;
+}
+
+.hud-halo {
+  inset: -15%;
+  background:
+    radial-gradient(circle, transparent 0 28%, rgba(0, 240, 250, .10) 42%, rgba(0, 159, 176, .06) 52%, transparent 70%);
+  filter: blur(7px);
+  opacity: .9;
+}
+
+.hud.is-active .hud-halo {
+  animation: refHaloPulse 2s ease-in-out infinite;
+}
+
+.hud-ring {
+  filter: drop-shadow(0 0 4px rgba(0, 242, 252, .36));
+}
+
+.ring-outer {
+  inset: 2%;
+  border: 1px solid rgba(0, 236, 245, .36);
+  background:
+    repeating-conic-gradient(from 12deg,
+      rgba(0, 246, 255, .72) 0deg 1.2deg,
+      transparent 1.2deg 5deg,
+      rgba(0, 112, 128, .28) 5deg 7deg,
+      transparent 7deg 13deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 93%, #000 93.4% 96%, transparent 96.4%);
+  mask: radial-gradient(circle, transparent 0 93%, #000 93.4% 96%, transparent 96.4%);
+  box-shadow: none;
+  animation: rotateCW 52s linear infinite;
+}
+
+.ring-outer::before {
+  inset: 7%;
+  border: 1px solid rgba(0, 243, 252, .24);
+  box-shadow:
+    0 0 0 9px rgba(0, 185, 198, .025),
+    0 0 0 28px rgba(0, 231, 241, .04),
+    0 0 32px rgba(0, 231, 241, .12);
+}
+
+.ring-outer::after {
+  inset: 15%;
+  border: 1px dashed rgba(0, 238, 248, .52);
+  box-shadow: none;
+}
+
+.ring-arc-a {
+  inset: 11%;
+  border: 0;
+  background: conic-gradient(from 15deg,
+    transparent 0 6%,
+    rgba(0, 248, 255, .95) 6% 8%,
+    transparent 8% 20%,
+    rgba(0, 173, 190, .65) 20% 24%,
+    transparent 24% 42%,
+    rgba(0, 248, 255, .82) 42% 46%,
+    transparent 46% 67%,
+    rgba(0, 210, 223, .58) 67% 72%,
+    transparent 72% 100%);
+  -webkit-mask: radial-gradient(circle, transparent 0 91%, #000 91.3% 96.5%, transparent 96.8%);
+  mask: radial-gradient(circle, transparent 0 91%, #000 91.3% 96.5%, transparent 96.8%);
+  animation: rotateCW 19s linear infinite;
+}
+
+.ring-arc-b {
+  inset: 19%;
+  border: 0;
+  background: conic-gradient(from 65deg,
+    rgba(0, 238, 247, .78) 0 3%,
+    transparent 3% 15%,
+    rgba(0, 239, 248, .36) 15% 20%,
+    transparent 20% 39%,
+    rgba(0, 246, 255, .9) 39% 43%,
+    transparent 43% 66%,
+    rgba(0, 164, 181, .62) 66% 73%,
+    transparent 73% 100%);
+  -webkit-mask: radial-gradient(circle, transparent 0 87%, #000 87.4% 95%, transparent 95.4%);
+  mask: radial-gradient(circle, transparent 0 87%, #000 87.4% 95%, transparent 95.4%);
+  animation: rotateCCW 28s linear infinite;
+}
+
+.ring-ticks {
+  inset: 27%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(0, 247, 255, .88) 0deg .55deg,
+    transparent .55deg 2.7deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 0 76%, #000 76.4% 96%, transparent 96.4%);
+  mask: radial-gradient(circle, transparent 0 76%, #000 76.4% 96%, transparent 96.4%);
+  opacity: .85;
+  animation: rotateCW 42s linear infinite;
+}
+
+.ring-inner {
+  inset: 35%;
+  border: 1px solid rgba(0, 246, 255, .58);
+  background:
+    repeating-conic-gradient(from 8deg,
+      rgba(0, 245, 255, .64) 0deg 1deg,
+      transparent 1deg 8deg),
+    radial-gradient(circle,
+      rgba(0, 236, 245, .10) 0 17%,
+      transparent 17.5% 33%,
+      rgba(0, 236, 245, .28) 33.5% 34.2%,
+      transparent 34.7% 53%,
+      rgba(0, 236, 245, .18) 53.3% 54%,
+      transparent 54.5%);
+  box-shadow:
+    0 0 22px rgba(0, 235, 245, .22),
+    inset 0 0 34px rgba(0, 221, 233, .08);
+  animation: rotateCCW 33s linear infinite;
+}
+
+.ring-inner::before {
+  inset: 18%;
+  border: 1px dotted rgba(0, 246, 255, .58);
+}
+
+.hud-center {
+  width: 35%;
+  height: 35%;
+  gap: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 10, 13, .82) 0 45%, rgba(0, 30, 35, .56) 70%, transparent 72%);
+  box-shadow:
+    0 0 0 1px rgba(0, 239, 248, .18),
+    0 0 36px rgba(0, 236, 246, .16),
+    inset 0 0 25px rgba(0, 238, 248, .08);
+}
+
+.hud-center::before,
+.hud-center::after {
+  left: -55%;
+  right: -55%;
+  background: linear-gradient(90deg, transparent, rgba(0, 245, 255, .28), rgba(0, 245, 255, .75), rgba(0, 245, 255, .28), transparent);
+}
+
+.hud-center::before { top: 49%; }
+.hud-center::after {
+  top: -56%;
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  width: 1px;
+  height: 212%;
+  background: linear-gradient(transparent, rgba(0, 245, 255, .25), rgba(0, 245, 255, .65), rgba(0, 245, 255, .25), transparent);
+}
+
+.hud-center strong {
+  font-size: clamp(31px, 4.8vw, 58px);
+  font-weight: 350;
+  letter-spacing: .30em;
+  padding-left: .30em;
+  color: rgba(236, 255, 255, .96);
+  text-shadow: 0 0 10px rgba(0, 244, 255, .92), 0 0 28px rgba(0, 180, 196, .5);
+}
+
+.voice-wave {
+  height: 23px;
+  gap: 4px;
+  opacity: .75;
+}
+
+.voice-wave i {
+  width: 2px;
+  background: #00f5ff;
+  box-shadow: 0 0 8px rgba(0, 245, 255, .85);
+}
+
+.voice-state {
+  color: rgba(180, 248, 250, .86);
+  font-size: 9px;
+  letter-spacing: .20em;
+  text-shadow: 0 0 7px rgba(0, 237, 246, .55);
+}
+
+.active-state {
+  margin-top: -16px;
+  padding: 7px 12px;
+  border: 1px solid rgba(0, 231, 241, .15);
+  border-radius: 999px;
+  background: rgba(0, 10, 13, .42);
+  backdrop-filter: blur(7px);
+  color: #6da4aa;
+  font-size: 10px;
+  letter-spacing: .28em;
+}
+
+.active-state i {
+  width: 7px;
+  height: 7px;
+  background: #31575c;
+}
+
+.active-state.online {
+  color: #a9f9fa;
+  border-color: rgba(0, 240, 250, .33);
+  box-shadow: 0 0 19px rgba(0, 231, 241, .10);
+}
+
+.active-state.online i {
+  background: #00f3ff;
+  box-shadow: 0 0 10px rgba(0, 243, 255, .9), 0 0 24px rgba(0, 243, 255, .38);
+}
+
+.system-signature {
+  color: rgba(111, 189, 195, .48);
+  font-size: 8px;
+  letter-spacing: .56em;
+}
+
+@keyframes refHaloPulse {
+  0%, 100% { transform: scale(.985); opacity: .68; }
+  50% { transform: scale(1.035); opacity: 1; }
+}
+
+@media (max-width: 800px) {
+  .voice-stage {
+    padding: 62px 0 62px;
+  }
+
+  .hud {
+    --hud-size: min(124vw, 76vh);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .hud-center {
+    width: 33%;
+    height: 33%;
+  }
+
+  .hud-center strong {
+    font-size: clamp(27px, 9vw, 44px);
+  }
+
+  .voice-state {
+    font-size: 7px;
+    letter-spacing: .13em;
+  }
+
+  .profile-trigger {
+    width: 44px;
+    height: 44px;
+    top: max(18px, env(safe-area-inset-top));
+    right: max(18px, env(safe-area-inset-right));
+  }
+
+  .active-state {
+    margin-top: -22px;
+  }
+
+  .luke-shell::before {
+    width: 152vw;
+  }
+
+  .luke-shell::after {
+    opacity: .28;
+    background-size: 135px 117px, 56px 56px, 56px 56px;
+  }
+}
+
+@media (max-width: 430px) {
+  .hud {
+    --hud-size: min(132vw, 73vh);
+  }
+
+  .hud-center {
+    width: 31%;
+    height: 31%;
+    gap: 9px;
+  }
+
+  .hud-center strong {
+    font-size: 30px;
+    letter-spacing: .24em;
+    padding-left: .24em;
+  }
+
+  .voice-wave {
+    height: 18px;
+  }
+
+  .voice-state {
+    transform: scale(.92);
+  }
+}
