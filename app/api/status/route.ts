@@ -20,9 +20,13 @@ export async function GET(request: Request) {
         error: null,
       };
 
+  const retellConfigured = Boolean(process.env.RETELL_API_KEY && process.env.RETELL_AGENT_ID);
+
   const status = {
     voice: deepgram.configured && deepgram.authenticated,
     deepgram,
+    retell: retellConfigured,
+    retellAgentId: process.env.RETELL_AGENT_ID || null,
     reasoning: Boolean(provider) || deepgram.configured,
     reasoningProvider: provider?.name || (deepgram.configured ? 'deepgram-managed' : null),
     memory: Boolean(process.env.HONCHO_API_KEY),
@@ -38,7 +42,7 @@ export async function GET(request: Request) {
     skills: LUKE_SKILLS.length,
     deviceContext: true,
     preciseLocation: 'permission-required',
-    outboundCalling: 'deferred',
+    outboundCalling: retellConfigured ? 'retell-web-ready' : 'deferred',
   };
 
   return NextResponse.json(status, { headers: { 'Cache-Control': 'no-store' } });
