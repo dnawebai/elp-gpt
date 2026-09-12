@@ -1,4 +1,5 @@
 import { Honcho } from '@honcho-ai/sdk';
+import { captureExecutiveArtifacts } from '@/lib/executive-memory';
 
 export type MemoryRole = 'user' | 'assistant';
 export type MemorySnapshot = {
@@ -84,6 +85,11 @@ export async function persistTranscript(
     if (!handles) return false;
     const peer = role === 'user' ? handles.user : handles.luke;
     await handles.session.addMessages([peer.message(content)]);
+
+    if (role === 'user') {
+      await captureExecutiveArtifacts(profileId, content);
+    }
+
     return true;
   } catch (error) {
     console.error('Honcho transcript persistence failed', error);
