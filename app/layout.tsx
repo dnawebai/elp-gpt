@@ -1,5 +1,6 @@
 import './globals.css';
 import './reference-hud.css';
+import './interaction-dock.css';
 import './profile.css';
 import './install-prompt.css';
 import type { Metadata, Viewport } from 'next';
