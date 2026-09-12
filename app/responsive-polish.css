@@ -1,0 +1,453 @@
+/* Final responsive art-direction pass for LUKE.
+   Goals: stronger focal hierarchy, less visual noise on wide screens, tighter
+   relationship between the HUD and controls, and dedicated tablet/mobile layouts. */
+
+:root {
+  --luke-safe-top: max(22px, env(safe-area-inset-top));
+  --luke-safe-bottom: max(18px, env(safe-area-inset-bottom));
+}
+
+/* ---------- Desktop / wide screens ---------- */
+@media (min-width: 1181px) {
+  .luke-shell {
+    background:
+      radial-gradient(circle at 50% 47%, rgba(0, 235, 245, .075), transparent 25%),
+      linear-gradient(135deg, transparent 0 13%, rgba(0, 239, 255, .045) 13.25%, transparent 18%),
+      linear-gradient(315deg, transparent 0 11%, rgba(0, 239, 255, .045) 11.25%, transparent 18%),
+      #00090b;
+  }
+
+  .luke-shell::before {
+    width: min(940px, 86vw, 90vh);
+    top: 47.5%;
+    opacity: .64;
+  }
+
+  .luke-shell::after {
+    opacity: .20;
+    background-size: 210px 182px, 84px 84px, 84px 84px;
+    -webkit-mask-image: radial-gradient(circle at 50% 48%, transparent 0 23%, #000 36%, #000 70%, transparent 90%);
+    mask-image: radial-gradient(circle at 50% 48%, transparent 0 23%, #000 36%, #000 70%, transparent 90%);
+  }
+
+  .ambient-one,
+  .ambient-two {
+    opacity: .48;
+  }
+
+  .voice-stage {
+    min-height: 100dvh;
+    padding: 76px 24px 176px;
+    gap: 12px;
+  }
+
+  .hud {
+    --hud-size: min(690px, 49vw, 66vh);
+    min-width: 520px;
+    min-height: 520px;
+  }
+
+  .hud-center {
+    width: 43%;
+    height: 43%;
+    gap: 14px;
+    background: radial-gradient(circle, rgba(0, 9, 12, .92) 0 48%, rgba(0, 27, 32, .70) 69%, transparent 72%);
+    box-shadow:
+      0 0 0 1px rgba(0, 239, 248, .22),
+      0 0 42px rgba(0, 236, 246, .18),
+      inset 0 0 30px rgba(0, 238, 248, .09);
+  }
+
+  .hud-center strong {
+    font-size: clamp(44px, 3.7vw, 64px);
+    letter-spacing: .25em;
+    padding-left: .25em;
+  }
+
+  .voice-state {
+    font-size: 10px;
+    letter-spacing: .18em;
+  }
+
+  .active-state {
+    margin-top: -8px;
+    font-size: 10px;
+    padding: 8px 14px;
+  }
+
+  .input-dock {
+    bottom: max(34px, calc(env(safe-area-inset-bottom) + 22px));
+    width: min(620px, calc(100vw - 48px));
+    gap: 8px;
+  }
+
+  .input-mode-switch {
+    padding: 5px;
+  }
+
+  .input-mode-switch button {
+    min-width: 104px;
+    height: 38px;
+    font-size: 10px;
+  }
+
+  .voice-mode-hint {
+    font-size: 9px;
+    opacity: .76;
+  }
+
+  .retell-call-dock {
+    right: 24px;
+    bottom: 28px;
+  }
+}
+
+/* ---------- Tablet ---------- */
+@media (min-width: 801px) and (max-width: 1180px) {
+  .luke-shell::before {
+    width: min(900px, 112vw, 94vh);
+    top: 47.5%;
+    opacity: .68;
+  }
+
+  .luke-shell::after {
+    opacity: .22;
+    background-size: 170px 147px, 68px 68px, 68px 68px;
+    -webkit-mask-image: radial-gradient(circle at 50% 48%, transparent 0 20%, #000 34%, #000 73%, transparent 91%);
+    mask-image: radial-gradient(circle at 50% 48%, transparent 0 20%, #000 34%, #000 73%, transparent 91%);
+  }
+
+  .voice-stage {
+    min-height: 100dvh;
+    padding: 74px 20px 168px;
+    gap: 12px;
+  }
+
+  .hud {
+    --hud-size: min(70vw, 65vh, 650px);
+    min-width: 430px;
+    min-height: 430px;
+  }
+
+  .hud-center {
+    width: 42%;
+    height: 42%;
+  }
+
+  .hud-center strong {
+    font-size: clamp(38px, 5vw, 54px);
+    letter-spacing: .25em;
+    padding-left: .25em;
+  }
+
+  .input-dock {
+    width: min(620px, calc(100vw - 40px));
+    bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
+  }
+
+  .text-composer {
+    border-radius: 17px;
+  }
+
+  .profile-trigger {
+    top: max(20px, env(safe-area-inset-top));
+    right: max(20px, env(safe-area-inset-right));
+  }
+
+  .retell-call-dock {
+    right: 16px;
+    bottom: calc(82px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Short desktop/tablet landscape: keep the controls and HUD in one visual unit. */
+@media (min-width: 801px) and (max-height: 780px) {
+  .voice-stage {
+    padding-top: 50px;
+    padding-bottom: 142px;
+  }
+
+  .hud {
+    --hud-size: min(560px, 52vw, 62vh);
+    min-width: 390px;
+    min-height: 390px;
+  }
+
+  .luke-shell::before {
+    width: min(780px, 86vw, 88vh);
+  }
+
+  .hud-center strong {
+    font-size: clamp(36px, 3.8vw, 50px);
+  }
+
+  .input-dock {
+    bottom: 18px;
+  }
+
+  .retell-call-dock {
+    bottom: 18px;
+  }
+}
+
+/* ---------- Mobile portrait ---------- */
+@media (max-width: 800px) {
+  html,
+  body,
+  .luke-shell {
+    min-height: 100svh;
+  }
+
+  .luke-shell {
+    background:
+      radial-gradient(circle at 50% 43%, rgba(0, 235, 245, .09), transparent 28%),
+      linear-gradient(180deg, #00080a 0%, #001014 54%, #000709 100%);
+  }
+
+  .luke-shell::before {
+    width: min(138vw, 760px);
+    top: 43.5%;
+    opacity: .68;
+  }
+
+  .luke-shell::after {
+    opacity: .16;
+    background-size: 128px 111px, 52px 52px, 52px 52px;
+    -webkit-mask-image: radial-gradient(circle at 50% 44%, transparent 0 24%, #000 38%, #000 72%, transparent 91%);
+    mask-image: radial-gradient(circle at 50% 44%, transparent 0 24%, #000 38%, #000 72%, transparent 91%);
+  }
+
+  .ambient-one,
+  .ambient-two {
+    opacity: .34;
+  }
+
+  .voice-stage {
+    min-height: 100svh;
+    padding: calc(70px + env(safe-area-inset-top)) 12px calc(176px + env(safe-area-inset-bottom));
+    align-content: center;
+    gap: 10px;
+  }
+
+  .hud {
+    --hud-size: min(96vw, 58vh, 540px);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .hud-center {
+    width: 41%;
+    height: 41%;
+    gap: 9px;
+  }
+
+  .hud-center strong {
+    font-size: clamp(31px, 9.8vw, 44px);
+    letter-spacing: .22em;
+    padding-left: .22em;
+  }
+
+  .voice-wave {
+    height: 20px;
+  }
+
+  .voice-state {
+    max-width: 150px;
+    justify-content: center;
+    font-size: 7px;
+    letter-spacing: .11em;
+    white-space: nowrap;
+  }
+
+  .active-state {
+    margin-top: -5px;
+    font-size: 9px;
+    letter-spacing: .22em;
+    padding: 7px 11px;
+  }
+
+  .input-dock {
+    left: 12px;
+    right: 12px;
+    bottom: max(12px, calc(env(safe-area-inset-bottom) + 10px));
+    width: auto;
+    transform: none;
+    gap: 8px;
+  }
+
+  .input-mode-switch {
+    padding: 4px;
+  }
+
+  .input-mode-switch button {
+    min-width: 88px;
+    height: 34px;
+  }
+
+  .text-composer {
+    width: 100%;
+    border-radius: 16px;
+    padding: 7px 7px 7px 14px;
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .text-composer input {
+    height: 44px;
+    font-size: 16px; /* prevents iOS zoom */
+  }
+
+  .text-turn {
+    width: 100%;
+    max-height: 72px;
+    font-size: 11px;
+    text-align: left;
+  }
+
+  .voice-mode-hint {
+    font-size: 8px;
+    letter-spacing: .07em;
+  }
+
+  .profile-trigger {
+    width: 44px;
+    height: 44px;
+    top: max(14px, env(safe-area-inset-top));
+    right: max(14px, env(safe-area-inset-right));
+  }
+
+  /* The call action moves away from the input dock and mirrors the profile control. */
+  .retell-call-dock {
+    top: max(14px, env(safe-area-inset-top));
+    left: max(14px, env(safe-area-inset-left));
+    right: auto;
+    bottom: auto;
+    align-items: flex-start;
+  }
+
+  .retell-call-button {
+    min-height: 44px;
+    padding: 0 13px;
+    font-size: 10px;
+  }
+
+  .system-signature {
+    bottom: calc(120px + env(safe-area-inset-bottom));
+    opacity: .34;
+  }
+}
+
+/* ---------- Narrow phones ---------- */
+@media (max-width: 430px) {
+  .luke-shell::before {
+    width: 148vw;
+    top: 42.5%;
+  }
+
+  .voice-stage {
+    padding-top: calc(66px + env(safe-area-inset-top));
+    padding-bottom: calc(164px + env(safe-area-inset-bottom));
+  }
+
+  .hud {
+    --hud-size: min(98vw, 55vh, 470px);
+  }
+
+  .hud-center {
+    width: 42%;
+    height: 42%;
+  }
+
+  .hud-center strong {
+    font-size: clamp(29px, 10.3vw, 39px);
+  }
+
+  .voice-state {
+    transform: none;
+    font-size: 6.7px;
+  }
+
+  .input-mode-switch button {
+    min-width: 80px;
+    height: 32px;
+    font-size: 8.5px;
+  }
+
+  .text-composer {
+    grid-template-columns: minmax(0, 1fr) 42px;
+  }
+
+  .text-composer input,
+  .text-composer-submit {
+    height: 42px;
+  }
+
+  .text-composer-submit {
+    width: 42px;
+  }
+
+  .retell-call-button {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    justify-content: center;
+    overflow: hidden;
+    gap: 0;
+    font-size: 0;
+  }
+}
+
+/* ---------- Landscape phones ---------- */
+@media (max-width: 800px) and (orientation: landscape) and (max-height: 520px) {
+  .voice-stage {
+    min-height: 100svh;
+    padding: 24px 150px 24px 24px;
+    justify-items: center;
+  }
+
+  .hud {
+    --hud-size: min(70vh, 54vw);
+  }
+
+  .luke-shell::before {
+    width: min(84vh, 70vw);
+    top: 50%;
+  }
+
+  .active-state {
+    position: absolute;
+    right: 22px;
+    top: 50%;
+    margin-top: -18px;
+  }
+
+  .input-dock {
+    left: auto;
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    width: min(310px, 40vw);
+    transform: none;
+  }
+
+  .text-turn {
+    display: none;
+  }
+
+  .retell-call-dock {
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+  }
+
+  .system-signature {
+    display: none;
+  }
+}
+
+/* Keyboard / focus accessibility: visible without changing the visual language. */
+.input-mode-switch button:focus-visible,
+.text-composer input:focus-visible,
+.text-composer-submit:focus-visible,
+.retell-call-button:focus-visible,
+.profile-trigger:focus-visible {
+  outline: 2px solid rgba(139, 250, 255, .9);
+  outline-offset: 3px;
+}
