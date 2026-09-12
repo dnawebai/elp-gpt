@@ -1,4 +1,4 @@
-import { buildLukeSystemPrompt, getReasoningProvider } from '@/lib/luke';
+import { buildLukeSystemPrompt, getReasoningProviders } from '@/lib/luke';
 import { bearerToken, verifyVoiceGatewayToken } from '@/lib/security';
 
 export const runtime = 'nodejs';
@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     return Response.json({ error: { message: 'Voice reasoning request too large.' } }, { status: 413 });
   }
 
-  const provider = getReasoningProvider();
-  if (!provider) {
+  const providers = getReasoningProviders();
+  if (!providers.length) {
     return Response.json({ error: { message: 'LUKE reasoning provider is not configured.' } }, { status: 503 });
   }
 
@@ -45,46 +45,62 @@ export async function POST(request: Request) {
   const maxTokens = Math.max(64, Math.min(Number(body.max_tokens) || 900, 1600));
   const stream = body.stream !== false;
 
-  const upstreamBody: Record<string, unknown> = {
-    model: provider.model,
+  const commonBody: Record<string, unknown> = {
     messages: [{ role: 'system', content: system }, ...history],
     stream,
     temperature: typeof body.temperature === 'number' ? Math.min(Math.max(body.temperature, 0), 1) : 0.3,
     max_tokens: maxTokens,
   };
 
-  if (Array.isArray(body.tools)) upstreamBody.tools = body.tools;
-  if (body.tool_choice !== undefined) upstreamBody.tool_choice = body.tool_choice;
-  if (Array.isArray(body.functions)) upstreamBody.functions = body.functions;
-  if (body.function_call !== undefined) upstreamBody.function_call = body.function_call;
+  if (Array.isArray(body.tools)) commonBody.tools = body.tools;
+  if (body.tool_choice !== undefined) commonBody.tool_choice = body.tool_choice;
+  if (Array.isArray(body.functions)) commonBody.functions = body.functions;
+  if (body.function_call !== undefined) commonBody.function_call = body.function_call;
 
-  const upstream = await fetch(`${provider.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}),
-    },
-    body: JSON.stringify(upstreamBody),
-    signal: AbortSignal.timeout(55_000),
-  });
+  const failures: string[] = [];
 
-  if (!upstream.ok) {
-    const detail = await upstream.text().catch(() => '');
-    console.error('LUKE voice gateway upstream error', provider.name, upstream.status, detail.slice(0, 300));
-    return Response.json(
-      { error: { message: `${provider.name} reasoning failed.`, type: 'upstream_error' } },
-      { status: 502 },
-    );
+  for (const provider of providers) {
+    try {
+      const upstream = await fetch(`${provider.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}),
+        },
+        body: JSON.stringify({ ...commonBody, model: provider.model }),
+        signal: AbortSignal.timeout(provider.name === 'hermes' ? 15_000 : 35_000),
+      });
+
+      if (!upstream.ok) {
+        const detail = await upstream.text().catch(() => '');
+        failures.push(`${provider.name}:${upstream.status}`);
+        console.error('LUKE voice gateway upstream error', provider.name, upstream.status, detail.slice(0, 300));
+        continue;
+      }
+
+      if (!upstream.body) {
+        failures.push(`${provider.name}:empty-body`);
+        continue;
+      }
+
+      return new Response(upstream.body, {
+        status: 200,
+        headers: {
+          'Content-Type': upstream.headers.get('content-type') || (stream ? 'text/event-stream' : 'application/json'),
+          'Cache-Control': 'no-store',
+          'X-Luke-Provider': provider.name,
+        },
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.name : 'error';
+      failures.push(`${provider.name}:${reason}`);
+      console.error('LUKE voice gateway provider failure', provider.name, error);
+    }
   }
 
-  if (!upstream.body) return new Response(null, { status: 502 });
-
-  return new Response(upstream.body, {
-    status: 200,
-    headers: {
-      'Content-Type': upstream.headers.get('content-type') || (stream ? 'text/event-stream' : 'application/json'),
-      'Cache-Control': 'no-store',
-      'X-Luke-Provider': provider.name,
-    },
-  });
+  console.error('LUKE voice gateway exhausted providers', failures.join(', '));
+  return Response.json(
+    { error: { message: 'LUKE reasoning providers are temporarily unavailable.', type: 'upstream_error' } },
+    { status: 502 },
+  );
 }
