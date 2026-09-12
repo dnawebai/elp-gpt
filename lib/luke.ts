@@ -1,6 +1,7 @@
 import { EXECUTIVE_DOCTRINE } from '@/lib/executive-doctrine';
 import { executiveMemoryToPrompt, getExecutiveMemorySnapshot } from '@/lib/executive-memory';
 import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
+import { lifeOperatorPrompt } from '@/lib/life-operator';
 import { skillsToPrompt } from '@/lib/skills';
 
 export type ChatMessage = {
@@ -95,6 +96,7 @@ export async function buildLukeSystemPrompt(profileId: string, sessionId: string
   const sections = [
     LUKE_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
+    lifeOperatorPrompt(),
     `AVAILABLE LUKE SKILLS:\n${skillsToPrompt()}`,
     executiveText ? `EXECUTIVE MEMORY CONTEXT:\n${executiveText}` : '',
     memoryText ? `LONG-TERM MEMORY CONTEXT:\n${memoryText}` : '',
