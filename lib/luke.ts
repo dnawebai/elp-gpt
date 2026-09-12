@@ -1,3 +1,5 @@
+import { EXECUTIVE_DOCTRINE } from '@/lib/executive-doctrine';
+import { executiveMemoryToPrompt, getExecutiveMemorySnapshot } from '@/lib/executive-memory';
 import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
 import { skillsToPrompt } from '@/lib/skills';
 
@@ -84,11 +86,17 @@ export function getReasoningProvider(): ReasoningProvider | null {
 }
 
 export async function buildLukeSystemPrompt(profileId: string, sessionId: string) {
-  const memory = await getMemorySnapshot(profileId, sessionId);
+  const [memory, executiveMemory] = await Promise.all([
+    getMemorySnapshot(profileId, sessionId),
+    getExecutiveMemorySnapshot(profileId),
+  ]);
   const memoryText = memoryToPrompt(memory);
+  const executiveText = executiveMemoryToPrompt(executiveMemory);
   const sections = [
     LUKE_SYSTEM_PROMPT,
+    EXECUTIVE_DOCTRINE,
     `AVAILABLE LUKE SKILLS:\n${skillsToPrompt()}`,
+    executiveText ? `EXECUTIVE MEMORY CONTEXT:\n${executiveText}` : '',
     memoryText ? `LONG-TERM MEMORY CONTEXT:\n${memoryText}` : '',
   ].filter(Boolean);
   return sections.join('\n\n');
