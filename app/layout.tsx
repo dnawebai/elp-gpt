@@ -1,9 +1,8 @@
 import './globals.css';
+import './reference-hud.css';
 import './profile.css';
-import './neural-vortex.css';
 import './install-prompt.css';
 import type { Metadata, Viewport } from 'next';
-import NeuralVortexBackdrop from './NeuralVortexBackdrop';
 import InstallAppPrompt from './InstallAppPrompt';
 
 export const metadata: Metadata = {
@@ -22,14 +21,13 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#010813',
+  themeColor: '#00090b',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <body>
-        <NeuralVortexBackdrop />
         {children}
         <InstallAppPrompt />
       </body>
