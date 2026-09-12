@@ -1,0 +1,70 @@
+.retell-call-dock {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: calc(22px + env(safe-area-inset-bottom));
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.retell-call-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 0 15px;
+  border: 1px solid rgba(82, 244, 255, .38);
+  border-radius: 999px;
+  background: rgba(0, 15, 20, .76);
+  color: #dfffff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  box-shadow: 0 0 26px rgba(0, 226, 240, .12), inset 0 0 18px rgba(36, 240, 255, .05);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.retell-call-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(110, 252, 255, .72);
+  box-shadow: 0 0 34px rgba(0, 226, 240, .2), inset 0 0 18px rgba(36, 240, 255, .08);
+}
+
+.retell-call-dock.is-active .retell-call-button {
+  background: rgba(0, 29, 34, .9);
+  border-color: rgba(111, 255, 235, .78);
+}
+
+.retell-call-dock.is-speaking .retell-call-button {
+  box-shadow: 0 0 42px rgba(0, 255, 230, .34), inset 0 0 22px rgba(65, 255, 238, .12);
+}
+
+.retell-call-error {
+  max-width: 280px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 112, 112, .28);
+  border-radius: 10px;
+  background: rgba(26, 5, 8, .86);
+  color: #ffd8d8;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.retell-spin { animation: retellSpin .9s linear infinite; }
+@keyframes retellSpin { to { transform: rotate(360deg); } }
+
+@media (max-width: 800px) {
+  .retell-call-dock {
+    right: 12px;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+  }
+  .retell-call-button { min-height: 40px; padding: 0 13px; font-size: 11px; }
+}
