@@ -1,0 +1,334 @@
+/* 21st.dev-inspired interaction layer for LUKE.
+   Voice states mirror the audio-reactive orb / AI voice-input patterns while
+   preserving the existing ELP GPT HUD artwork and control model. */
+
+.luke-shell.mode-listening .hud-halo {
+  animation: lukeListenHalo 1.15s ease-in-out infinite;
+}
+
+.luke-shell.mode-listening .ring-outer {
+  animation-duration: 26s;
+  filter: drop-shadow(0 0 8px rgba(0, 246, 255, .52));
+}
+
+.luke-shell.mode-listening .ring-arc-a {
+  animation-duration: 10s;
+}
+
+.luke-shell.mode-listening .ring-arc-b {
+  animation-duration: 14s;
+}
+
+.luke-shell.mode-listening .ring-ticks {
+  animation-duration: 18s;
+}
+
+.luke-shell.mode-listening .hud-center {
+  animation: lukeListenCore 1.15s ease-in-out infinite;
+}
+
+.luke-shell.mode-listening .voice-wave i {
+  animation: lukeInputBar .72s ease-in-out infinite alternate;
+}
+
+.luke-shell.mode-listening .voice-wave i:nth-child(2) { animation-delay: -.18s; }
+.luke-shell.mode-listening .voice-wave i:nth-child(3) { animation-delay: -.37s; }
+.luke-shell.mode-listening .voice-wave i:nth-child(4) { animation-delay: -.11s; }
+.luke-shell.mode-listening .voice-wave i:nth-child(5) { animation-delay: -.46s; }
+.luke-shell.mode-listening .voice-wave i:nth-child(6) { animation-delay: -.26s; }
+.luke-shell.mode-listening .voice-wave i:nth-child(7) { animation-delay: -.52s; }
+
+.luke-shell.mode-speaking .hud-halo {
+  animation: lukeSpeakHalo .46s ease-in-out infinite alternate;
+}
+
+.luke-shell.mode-speaking .ring-outer {
+  animation-duration: 8s;
+  filter: drop-shadow(0 0 14px rgba(0, 248, 255, .8));
+}
+
+.luke-shell.mode-speaking .ring-arc-a { animation-duration: 4.8s; }
+.luke-shell.mode-speaking .ring-arc-b { animation-duration: 6.4s; }
+.luke-shell.mode-speaking .ring-ticks { animation-duration: 7s; }
+.luke-shell.mode-speaking .ring-inner { animation-duration: 5.8s; }
+
+.luke-shell.mode-speaking .hud-center {
+  animation: lukeSpeakCore .42s ease-in-out infinite alternate;
+}
+
+.luke-shell.mode-speaking .voice-wave i {
+  animation: lukeOutputBar .34s ease-in-out infinite alternate;
+}
+
+.luke-shell.mode-speaking .voice-wave i:nth-child(2) { animation-delay: -.12s; }
+.luke-shell.mode-speaking .voice-wave i:nth-child(3) { animation-delay: -.24s; }
+.luke-shell.mode-speaking .voice-wave i:nth-child(4) { animation-delay: -.08s; }
+.luke-shell.mode-speaking .voice-wave i:nth-child(5) { animation-delay: -.29s; }
+.luke-shell.mode-speaking .voice-wave i:nth-child(6) { animation-delay: -.17s; }
+.luke-shell.mode-speaking .voice-wave i:nth-child(7) { animation-delay: -.31s; }
+
+.luke-shell.mode-thinking .ring-outer { animation-duration: 15s; }
+.luke-shell.mode-thinking .ring-arc-a { animation-duration: 7.5s; }
+.luke-shell.mode-thinking .ring-arc-b { animation-duration: 9s; }
+.luke-shell.mode-thinking .ring-ticks { animation-duration: 11s; }
+.luke-shell.mode-thinking .ring-inner { animation-duration: 10s; }
+
+.luke-shell.mode-thinking .hud-center {
+  animation: lukeThinkingCore 1.35s ease-in-out infinite;
+}
+
+.luke-shell.mode-thinking::before {
+  animation: lukeThinkingField 2.2s ease-in-out infinite;
+}
+
+.input-dock {
+  position: fixed;
+  z-index: 24;
+  left: 50%;
+  bottom: max(26px, calc(env(safe-area-inset-bottom) + 16px));
+  width: min(680px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.input-mode-switch,
+.text-composer,
+.text-turn {
+  pointer-events: auto;
+}
+
+.input-mode-switch {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid rgba(0, 240, 250, .2);
+  border-radius: 999px;
+  background: rgba(0, 10, 13, .7);
+  box-shadow: 0 8px 36px rgba(0, 0, 0, .32), inset 0 0 24px rgba(0, 239, 248, .025);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.input-mode-switch button {
+  min-width: 92px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: transparent;
+  color: #6f9ca3;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color .2s ease, background .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.input-mode-switch button:hover {
+  color: #bdf9fb;
+}
+
+.input-mode-switch button.active {
+  color: #edffff;
+  background: rgba(0, 232, 242, .13);
+  box-shadow: inset 0 0 18px rgba(0, 241, 250, .08), 0 0 16px rgba(0, 231, 241, .08);
+}
+
+.text-composer {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 9px;
+  padding: 8px 8px 8px 16px;
+  border: 1px solid rgba(0, 241, 250, .22);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(2, 20, 24, .9), rgba(0, 10, 13, .88));
+  box-shadow: 0 16px 54px rgba(0, 0, 0, .42), 0 0 30px rgba(0, 220, 232, .055), inset 0 0 30px rgba(0, 236, 245, .025);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.text-composer input {
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #eaffff;
+  font-size: 15px;
+  caret-color: #00f6ff;
+}
+
+.text-composer input::placeholder {
+  color: #587d83;
+}
+
+.text-composer-submit {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(0, 244, 255, .29);
+  border-radius: 12px;
+  background: rgba(0, 224, 235, .12);
+  color: #dfffff;
+  cursor: pointer;
+  box-shadow: inset 0 0 16px rgba(0, 245, 255, .05);
+  transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.text-composer-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(0, 232, 242, .18);
+  box-shadow: 0 0 18px rgba(0, 234, 244, .13), inset 0 0 16px rgba(0, 245, 255, .08);
+}
+
+.text-composer-submit:disabled {
+  opacity: .38;
+  cursor: default;
+}
+
+.text-composer-submit.is-busy svg {
+  animation: lukeSpin .8s linear infinite;
+}
+
+.text-turn {
+  width: min(620px, calc(100vw - 48px));
+  max-height: 110px;
+  overflow: auto;
+  margin: 0;
+  padding: 9px 13px;
+  border: 1px solid rgba(0, 231, 241, .11);
+  border-radius: 13px;
+  background: rgba(0, 11, 14, .64);
+  color: #89afb4;
+  font-size: 11px;
+  line-height: 1.48;
+  text-align: center;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.text-turn.assistant {
+  color: #bcecef;
+  border-color: rgba(0, 241, 250, .17);
+}
+
+.voice-mode-hint {
+  pointer-events: none;
+  margin: 0;
+  color: rgba(103, 151, 157, .8);
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.input-dock.mode-text ~ .system-signature,
+.luke-shell:has(.input-dock.mode-text) .system-signature {
+  opacity: .18;
+}
+
+@keyframes lukeListenHalo {
+  0%, 100% { transform: scale(.98); opacity: .72; }
+  50% { transform: scale(1.025); opacity: 1; }
+}
+
+@keyframes lukeListenCore {
+  0%, 100% { transform: scale(.992); box-shadow: 0 0 0 1px rgba(0,239,248,.18), 0 0 30px rgba(0,236,246,.13), inset 0 0 25px rgba(0,238,248,.07); }
+  50% { transform: scale(1.015); box-shadow: 0 0 0 1px rgba(0,246,255,.32), 0 0 52px rgba(0,243,253,.26), inset 0 0 34px rgba(0,238,248,.12); }
+}
+
+@keyframes lukeSpeakHalo {
+  from { transform: scale(.97); opacity: .74; }
+  to { transform: scale(1.045); opacity: 1; }
+}
+
+@keyframes lukeSpeakCore {
+  from { transform: scale(.985); filter: brightness(1); }
+  to { transform: scale(1.045); filter: brightness(1.22); }
+}
+
+@keyframes lukeThinkingCore {
+  0%, 100% { transform: rotate(-1deg) scale(.995); filter: brightness(.92); }
+  50% { transform: rotate(1deg) scale(1.018); filter: brightness(1.15); }
+}
+
+@keyframes lukeThinkingField {
+  0%, 100% { opacity: .62; filter: brightness(.88); }
+  50% { opacity: .95; filter: brightness(1.22); }
+}
+
+@keyframes lukeInputBar {
+  from { transform: scaleY(.32); opacity: .45; }
+  to { transform: scaleY(1.24); opacity: 1; }
+}
+
+@keyframes lukeOutputBar {
+  from { transform: scaleY(.28); opacity: .46; }
+  to { transform: scaleY(1.5); opacity: 1; }
+}
+
+@keyframes lukeSpin { to { transform: rotate(360deg); } }
+
+@media (max-width: 800px) {
+  .input-dock {
+    bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+    width: min(94vw, 620px);
+  }
+
+  .text-composer {
+    border-radius: 16px;
+  }
+
+  .text-turn {
+    max-height: 84px;
+  }
+
+  .luke-shell:has(.input-dock.mode-text) .active-state {
+    transform: translateY(-54px);
+  }
+}
+
+@media (max-width: 430px) {
+  .input-mode-switch button {
+    min-width: 82px;
+    height: 32px;
+    font-size: 9px;
+  }
+
+  .text-composer {
+    grid-template-columns: minmax(0, 1fr) 42px;
+    padding: 7px 7px 7px 13px;
+  }
+
+  .text-composer input {
+    height: 42px;
+    font-size: 14px;
+  }
+
+  .text-composer-submit {
+    width: 42px;
+    height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .luke-shell.mode-listening .hud-halo,
+  .luke-shell.mode-listening .hud-center,
+  .luke-shell.mode-speaking .hud-halo,
+  .luke-shell.mode-speaking .hud-center,
+  .luke-shell.mode-thinking .hud-center,
+  .luke-shell.mode-thinking::before,
+  .voice-wave i {
+    animation: none !important;
+  }
+}
