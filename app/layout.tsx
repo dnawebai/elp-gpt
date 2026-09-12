@@ -3,8 +3,10 @@ import './reference-hud.css';
 import './interaction-dock.css';
 import './profile.css';
 import './install-prompt.css';
+import './retell-call.css';
 import type { Metadata, Viewport } from 'next';
 import InstallAppPrompt from './InstallAppPrompt';
+import RetellCallDock from './RetellCallDock';
 
 export const metadata: Metadata = {
   title: 'LUKE — ELP GPT',
@@ -30,6 +32,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         {children}
+        <RetellCallDock />
         <InstallAppPrompt />
       </body>
     </html>
