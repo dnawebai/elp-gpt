@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { NotificationKind, NotificationSeverity } from '@/lib/notification-store';
 
 export type NotificationChannel = 'push' | 'email' | 'sms' | 'whatsapp' | 'voice';
@@ -94,7 +95,7 @@ export function shouldDeliverNotification(args: {
   channel: NotificationChannel;
   severity: NotificationSeverity;
   kind: NotificationKind;
-  lastSeenAt: string;
+  firstSeenAt: string;
   preferences: NotificationDeliveryPreferences;
   now?: Date;
 }) {
@@ -102,12 +103,22 @@ export function shouldDeliverNotification(args: {
   if (!enabledChannels(args.preferences).includes(args.channel)) return false;
   const delay = notificationChannelDelayMinutes(args);
   if (!Number.isFinite(delay)) return false;
-  const seen = Date.parse(args.lastSeenAt);
-  if (!Number.isFinite(seen) || now.getTime() - seen < delay * 60_000) return false;
+  const firstSeen = Date.parse(args.firstSeenAt);
+  if (!Number.isFinite(firstSeen) || now.getTime() - firstSeen < delay * 60_000) return false;
   if (args.severity !== 'critical' && isQuietHours(args.preferences, now)) return false;
   return true;
 }
 
-export function deliveryKey(notification: { id: string; occurrenceCount: number; updatedAt: string }, channel: NotificationChannel) {
-  return `${notification.id}:${notification.occurrenceCount}:${Date.parse(notification.updatedAt) || 0}:${channel}`;
+export function deliveryKey(notification: {
+  id: string;
+  title: string;
+  summary: string;
+  severity: NotificationSeverity;
+  action?: string;
+}, channel: NotificationChannel) {
+  const contentHash = createHash('sha256')
+    .update(`${notification.title}|${notification.summary}|${notification.severity}|${notification.action || ''}`)
+    .digest('hex')
+    .slice(0, 16);
+  return `${notification.id}:${contentHash}:${channel}`;
 }
