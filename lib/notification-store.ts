@@ -2,7 +2,7 @@ import { Honcho } from '@honcho-ai/sdk';
 
 export type NotificationKind = 'approval' | 'failure' | 'risk' | 'opportunity' | 'deadline' | 'relationship' | 'task' | 'completion' | 'system';
 export type NotificationSeverity = 'critical' | 'high' | 'normal' | 'low';
-export type NotificationStatus = 'unread' | 'read' | 'dismissed';
+export type NotificationStatus = 'unread' | 'read' | 'dismissed' | 'resolved';
 
 export type NotificationRecord = {
   id: string;
@@ -40,7 +40,7 @@ export type NotificationCenter = {
 
 const KINDS = new Set<NotificationKind>(['approval', 'failure', 'risk', 'opportunity', 'deadline', 'relationship', 'task', 'completion', 'system']);
 const SEVERITIES = new Set<NotificationSeverity>(['critical', 'high', 'normal', 'low']);
-const STATUSES = new Set<NotificationStatus>(['unread', 'read', 'dismissed']);
+const STATUSES = new Set<NotificationStatus>(['unread', 'read', 'dismissed', 'resolved']);
 const severityRank: Record<NotificationSeverity, number> = { critical: 4, high: 3, normal: 2, low: 1 };
 
 function workspaceId() {
@@ -107,7 +107,7 @@ function parseNotification(message: { id: string; createdAt: string; metadata: R
 }
 
 function stats(records: NotificationRecord[]) {
-  const active = records.filter((record) => record.status !== 'dismissed');
+  const active = records.filter((record) => record.status === 'unread' || record.status === 'read');
   return {
     total: active.length,
     unread: active.filter((record) => record.status === 'unread').length,
@@ -144,23 +144,26 @@ export async function getNotificationCenter(profileId: string): Promise<Notifica
 }
 
 export async function upsertNotificationCandidates(profileId: string, candidates: NotificationCandidate[]) {
-  if (!process.env.HONCHO_API_KEY) return { ok: false, newCount: 0, updatedCount: 0, center: emptyCenter(false) };
+  if (!process.env.HONCHO_API_KEY) return { ok: false, newCount: 0, updatedCount: 0, resolvedCount: 0, center: emptyCenter(false) };
   const handles = await getNotificationSession(profileId);
-  if (!handles) return { ok: false, newCount: 0, updatedCount: 0, center: emptyCenter(false) };
+  if (!handles) return { ok: false, newCount: 0, updatedCount: 0, resolvedCount: 0, center: emptyCenter(false) };
   const page = await handles.session.messages({ size: 200, reverse: true });
   const existing = page.items
     .map((message) => ({ message, record: parseNotification(message) }))
     .filter((item): item is { message: (typeof page.items)[number]; record: NotificationRecord } => Boolean(item.record));
   const byFingerprint = new Map(existing.map((item) => [item.record.fingerprint, item]));
+  const activeFingerprints = new Set(candidates.map((candidate) => candidate.fingerprint));
   const now = new Date().toISOString();
   let newCount = 0;
   let updatedCount = 0;
+  let resolvedCount = 0;
 
   for (const candidate of candidates) {
     const found = byFingerprint.get(candidate.fingerprint);
     if (found) {
       if (found.record.status === 'dismissed') continue;
       const changed = found.record.title !== candidate.title || found.record.summary !== candidate.summary || found.record.severity !== candidate.severity || found.record.action !== candidate.action;
+      const nextStatus = found.record.status === 'resolved' || (changed && found.record.status === 'read') ? 'unread' : found.record.status;
       await handles.session.updateMessage(found.message.id, {
         ...found.message.metadata,
         jarbisNotification: true,
@@ -176,7 +179,7 @@ export async function upsertNotificationCandidates(profileId: string, candidates
         lastSeenAt: now,
         updatedAt: now,
         occurrenceCount: found.record.occurrenceCount + 1,
-        status: changed && found.record.status === 'read' ? 'unread' : found.record.status,
+        status: nextStatus,
       });
       updatedCount += 1;
       continue;
@@ -204,7 +207,20 @@ export async function upsertNotificationCandidates(profileId: string, candidates
     }]);
     newCount += 1;
   }
-  return { ok: true, newCount, updatedCount, center: await getNotificationCenter(profileId) };
+
+  for (const item of existing) {
+    if (!activeFingerprints.has(item.record.fingerprint) && (item.record.status === 'unread' || item.record.status === 'read')) {
+      await handles.session.updateMessage(item.message.id, {
+        ...item.message.metadata,
+        jarbisNotification: true,
+        status: 'resolved',
+        updatedAt: now,
+      });
+      resolvedCount += 1;
+    }
+  }
+
+  return { ok: true, newCount, updatedCount, resolvedCount, center: await getNotificationCenter(profileId) };
 }
 
 export async function updateNotification(profileId: string, id: string, status: NotificationStatus) {
