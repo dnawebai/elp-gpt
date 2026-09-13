@@ -1,7 +1,7 @@
 import { Honcho } from '@honcho-ai/sdk';
 
 export type PriorityHorizon = 'now' | 'today' | 'week';
-export type PrioritySource = 'task' | 'goal' | 'commitment' | 'delegation' | 'relationship' | 'risk' | 'capacity';
+export type PrioritySource = 'task' | 'goal' | 'commitment' | 'delegation' | 'relationship' | 'risk' | 'capacity' | 'notification';
 
 export type PriorityItem = {
   id: string;
