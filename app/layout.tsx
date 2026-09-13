@@ -8,6 +8,7 @@ import './responsive-polish.css';
 import type { Metadata, Viewport } from 'next';
 import InstallAppPrompt from './InstallAppPrompt';
 import RetellCallDock from './RetellCallDock';
+import ServiceWorkerRegistration from './ServiceWorkerRegistration';
 
 const SITE_URL = 'https://elpgpt.com';
 const TITLE = 'ELP GPT — AI Voice Assistant & Operator';
@@ -84,6 +85,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(webAppSchema) }}
         />
+        <ServiceWorkerRegistration />
         {children}
         <RetellCallDock />
         <InstallAppPrompt />
