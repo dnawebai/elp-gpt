@@ -93,7 +93,7 @@ export async function runResourceCapacityPlanner(args: { profileId: string; pers
   for (const item of ledger.items.filter((x) => x.primaryKind === 'commitment' && (x.status === 'active' || x.status === 'blocked'))) {
     const due = daysUntil(item.dueDate);
     const urgency = due !== null && due <= 2 ? 1.5 : due !== null && due <= 7 ? 1.2 : 1;
-    demand.push({ id: `commitment:${item.id}`, source: 'commitment', sourceId: item.id, title: item.title, owner: item.owner, priority: item.priority === 'high' ? 'high' : 'normal', dueDate: item.dueDate, estimatedHours: round(profile.defaultTaskHours * urgency), reason: item.blocked ? 'Blocked executive commitment.' : item.overdue ? 'Overdue executive commitment.' : 'Open executive commitment requires capacity.' });
+    demand.push({ id: `commitment:${item.id}`, source: 'commitment', sourceId: item.id, title: item.title, owner: item.owner, priority: item.priority === 'high' ? 'high' : 'normal', dueDate: item.dueDate, estimatedHours: round(profile.defaultTaskHours * urgency), reason: item.status === 'blocked' ? 'Blocked executive commitment.' : item.overdue ? 'Overdue executive commitment.' : 'Open executive commitment requires capacity.' });
   }
   for (const delegation of portfolio.delegations.filter((item) => !['completed', 'cancelled'].includes(item.status))) {
     const recoveryFactor = delegation.status === 'blocked' ? 0.7 : portfolio.delegationExceptions.some((e) => e.delegation.id === delegation.id) ? 0.4 : 0.15;
