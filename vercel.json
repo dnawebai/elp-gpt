@@ -13,6 +13,7 @@
     { "path": "/api/cron/decision-learning", "schedule": "53 */6 * * *" },
     { "path": "/api/cron/portfolio-control", "schedule": "29 */4 * * *" },
     { "path": "/api/cron/resource-capacity", "schedule": "41 */4 * * *" },
-    { "path": "/api/cron/daily-operating-plan", "schedule": "47 */2 * * *" }
+    { "path": "/api/cron/daily-operating-plan", "schedule": "47 */2 * * *" },
+    { "path": "/api/cron/execution-schedule", "schedule": "17 * * * *" }
   ]
 }
