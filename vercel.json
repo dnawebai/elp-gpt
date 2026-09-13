@@ -11,6 +11,7 @@
     { "path": "/api/cron/anticipatory-chief-of-staff", "schedule": "37 */3 * * *" },
     { "path": "/api/cron/meeting-outcomes", "schedule": "43 */6 * * *" },
     { "path": "/api/cron/decision-learning", "schedule": "53 */6 * * *" },
-    { "path": "/api/cron/portfolio-control", "schedule": "29 */4 * * *" }
+    { "path": "/api/cron/portfolio-control", "schedule": "29 */4 * * *" },
+    { "path": "/api/cron/resource-capacity", "schedule": "41 */4 * * *" }
   ]
 }
