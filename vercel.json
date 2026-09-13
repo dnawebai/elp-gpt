@@ -22,6 +22,10 @@
       "schedule": "7 * * * *"
     },
     {
+      "path": "/api/cron/commitment-fulfilment",
+      "schedule": "23 */2 * * *"
+    },
+    {
       "path": "/api/cron/meeting-outcomes",
       "schedule": "43 */6 * * *"
     }
