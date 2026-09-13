@@ -79,8 +79,10 @@ export async function recordMeetingFollowUpExecuted(profileId: string, meetingId
 
   const source = `meeting-follow-up:${meetingId}:${index}`;
   const board = await getTaskBoard(profileId);
-  const task = [...board.queues.now, ...board.queues.decisions, ...board.queues.working, ...board.queues.delegated]
-    .find((item) => item.source === source);
+  const active = [...board.queues.now, ...board.queues.decisions, ...board.queues.working, ...board.queues.delegated];
+  const exact = active.find((item) => item.source === source);
+  const legacyCandidates = active.filter((item) => item.source === 'meeting-follow-up' && item.objective.toLowerCase().includes(followUp.target.toLowerCase()) && item.objective.toLowerCase().includes(meeting.title.toLowerCase()));
+  const task = exact || (legacyCandidates.length === 1 ? legacyCandidates[0] : undefined);
   if (task) {
     await updateTask(profileId, task.id, {
       queue: 'done',
