@@ -14,20 +14,50 @@ function readProfile(request: Request) {
   return verifyProfileToken(value);
 }
 
+function providerErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  if (message.includes('(401)') || message.includes('APIKey_InvalidAPIKey')) {
+    return 'Composio project authentication failed. Replace COMPOSIO_API_KEY with a valid project API key.';
+  }
+  return 'Connected account provider is temporarily unavailable.';
+}
+
 export async function GET(request: Request) {
+  const profile = readProfile(request);
+  if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
+
+  const configured = isConnectionsConfigured();
+  if (!configured) {
+    return NextResponse.json({
+      configured: false,
+      providerReady: false,
+      providerError: 'Composio is not configured on this deployment.',
+      accounts: [],
+      policies: CONNECTION_POLICIES,
+      profileId: profile.profileId,
+    }, { headers: { 'Cache-Control': 'no-store, private' } });
+  }
+
   try {
-    const profile = readProfile(request);
-    if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
     const accounts = await listConnectedAccounts(profile.profileId);
     return NextResponse.json({
-      configured: isConnectionsConfigured(),
+      configured: true,
+      providerReady: true,
+      providerError: null,
       accounts,
       policies: CONNECTION_POLICIES,
       profileId: profile.profileId,
     }, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) {
-    console.error('Connected account read failed', error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Connected account read failed.' }, { status: 500 });
+    console.error('Connected account provider read failed', error);
+    return NextResponse.json({
+      configured: true,
+      providerReady: false,
+      providerError: providerErrorMessage(error),
+      accounts: [],
+      policies: CONNECTION_POLICIES,
+      profileId: profile.profileId,
+    }, { headers: { 'Cache-Control': 'no-store, private' } });
   }
 }
 
@@ -46,7 +76,7 @@ export async function POST(request: Request) {
     return NextResponse.json(link, { status: 201, headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) {
     console.error('Connected account link creation failed', error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Could not create connection link.' }, { status: 500 });
+    return NextResponse.json({ error: providerErrorMessage(error) }, { status: 503 });
   }
 }
 
@@ -62,6 +92,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) {
     console.error('Connected account status update failed', error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Could not update connected account.' }, { status: 500 });
+    return NextResponse.json({ error: providerErrorMessage(error) }, { status: 503 });
   }
 }
