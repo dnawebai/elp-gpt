@@ -7,6 +7,7 @@ import {
 } from '@/lib/executive-memory';
 import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
 import { lifeOperatorPrompt } from '@/lib/life-operator';
+import { getNotificationCenter, notificationCenterToPrompt } from '@/lib/notifications';
 import { getRelationshipSnapshot, relationshipSnapshotToPrompt } from '@/lib/relationship-memory';
 import { skillsToPrompt } from '@/lib/skills';
 import { getTaskBoard, taskBoardToPrompt } from '@/lib/task-router';
@@ -52,6 +53,7 @@ Action planning:
 - External writes, communications, bookings, purchases, cancellations, deployments, security changes, and other commitments require the configured approval policy.
 - When an action fails, report the actual failure and the missing dependency rather than pretending it completed.
 - Treat the Command Center as the live work queue. Do not duplicate work already in ELP WORKING or DELEGATED. Prioritise NOW first, surface DECISIONS when the principal's input blocks progress, and move work to DONE only when completion is verified.
+- Treat unread critical/high notifications as the principal's active exception queue. Surface them when directly relevant, when the principal asks what needs attention, or when they materially change the answer. Do not repeat dismissed notifications.
 - Use relationship intelligence as decision context, not as unquestioned truth. Preserve evidence/confidence distinctions and never infer sensitive traits or recommend manipulative exploitation of a person's vulnerabilities.
 
 Voice output rules:
@@ -96,23 +98,26 @@ export function getReasoningProvider(): ReasoningProvider | null {
 }
 
 export async function buildLukeSystemPrompt(profileId: string, sessionId: string) {
-  const [memory, executiveMemory, executiveLedger, taskBoard, relationships] = await Promise.all([
+  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications] = await Promise.all([
     getMemorySnapshot(profileId, sessionId),
     getExecutiveMemorySnapshot(profileId),
     getExecutiveLedger(profileId),
     getTaskBoard(profileId),
     getRelationshipSnapshot(profileId),
+    getNotificationCenter(profileId),
   ]);
   const memoryText = memoryToPrompt(memory);
   const executiveText = executiveMemoryToPrompt(executiveMemory);
   const ledgerText = executiveLedgerToPrompt(executiveLedger);
   const taskText = taskBoardToPrompt(taskBoard);
   const relationshipText = relationshipSnapshotToPrompt(relationships);
+  const notificationText = notificationCenterToPrompt(notifications);
   const sections = [
     LUKE_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
     lifeOperatorPrompt(),
     `AVAILABLE LUKE SKILLS:\n${skillsToPrompt()}`,
+    notificationText ? `PRIORITY NOTIFICATIONS:\n${notificationText}` : '',
     taskText ? `LIVE COMMAND CENTER:\n${taskText}` : '',
     relationshipText ? `LIVE RELATIONSHIP INTELLIGENCE:\n${relationshipText}` : '',
     ledgerText ? `LIVE EXECUTIVE CONTROL LEDGER:\n${ledgerText}` : '',
