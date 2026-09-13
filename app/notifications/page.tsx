@@ -9,7 +9,7 @@ type NotificationRecord = {
   id: string;
   kind: 'approval' | 'failure' | 'risk' | 'opportunity' | 'deadline' | 'relationship' | 'task' | 'completion' | 'system';
   severity: 'critical' | 'high' | 'normal' | 'low';
-  status: 'unread' | 'read' | 'dismissed';
+  status: 'unread' | 'read' | 'dismissed' | 'resolved';
   title: string;
   summary: string;
   source: string;
@@ -99,7 +99,7 @@ export default function NotificationsPage() {
     }
   }, [load]);
 
-  const visible = center?.notifications.filter((item) => item.status !== 'dismissed') || [];
+  const visible = center?.notifications.filter((item) => item.status === 'unread' || item.status === 'read') || [];
   return <main className="nt-shell">
     <header className="nt-header">
       <Link href="/command-center" className="nt-back"><ArrowLeft size={17} /> COMMAND CENTER</Link>
