@@ -287,9 +287,13 @@ export async function runCommitmentFulfilmentCycle(args: { profileId: string; se
 async function findRecord(profileId: string, recordId: string) {
   const handles = await getFulfilmentSession(profileId);
   if (!handles) return null;
-  const message = await handles.session.getMessage(recordId);
-  const record = parseRecord(message);
-  return record ? { handles, message, record } : null;
+  const page = await handles.session.messages({ size: 100, reverse: true });
+  for (const message of page.items) {
+    if (message.id !== recordId) continue;
+    const record = parseRecord(message);
+    return record ? { handles, message, record } : null;
+  }
+  return null;
 }
 
 export async function getFulfilmentPendingAction(profileId: string, recordId: string) {
