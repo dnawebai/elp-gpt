@@ -1,4 +1,4 @@
-import { getReasoningProviders } from '@/lib/luke';
+import { getReasoningProviders } from '@/lib/elp';
 import { runOperatorMission, type OperatorMissionResult, type OperatorMissionState } from '@/lib/operator';
 import {
   getMeetingOutcome,

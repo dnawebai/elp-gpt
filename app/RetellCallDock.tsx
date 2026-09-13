@@ -24,7 +24,7 @@ export default function RetellCallDock() {
     setState('connecting');
 
     try {
-      const sessionId = window.sessionStorage.getItem('luke-session-id') || 'web';
+      const sessionId = window.sessionStorage.getItem('elp-session-id') || 'web';
       const response = await fetch('/api/retell/web-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,12 +67,12 @@ export default function RetellCallDock() {
   const label = state === 'connecting'
     ? 'Connecting'
     : state === 'speaking'
-      ? 'LUKE speaking'
+      ? 'ELP speaking'
       : state === 'ready'
         ? 'Retell live'
         : state === 'error'
           ? 'Retry Retell'
-          : 'Call LUKE';
+          : 'Call ELP';
 
   return (
     <div className={`retell-call-dock ${active ? 'is-active' : ''} ${state === 'speaking' ? 'is-speaking' : ''}`}>
@@ -80,7 +80,7 @@ export default function RetellCallDock() {
         type="button"
         className="retell-call-button"
         onClick={() => active ? void stopCall() : void startCall()}
-        aria-label={active ? 'End LUKE Retell call' : 'Start LUKE Retell call'}
+        aria-label={active ? 'End ELP Retell call' : 'Start ELP Retell call'}
       >
         {state === 'connecting'
           ? <LoaderCircle size={18} className="retell-spin" />

@@ -1,13 +1,13 @@
-# ELP GPT — LUKE
+# ELP GPT
 
-LUKE is a cross-device, voice-first intelligence system. The home surface stays intentionally minimal: the circular LUKE HUD is the primary interface, while profile, memory, signals, skills, briefings, permissions, and diagnostics remain hidden until the profile is opened.
+ELP is a cross-device, voice-first intelligence system. The home surface stays intentionally minimal: the circular ELP HUD is the primary interface, while profile, memory, signals, skills, briefings, permissions, and diagnostics remain hidden until the profile is opened.
 
 ## Implemented foundation
 
 - Responsive desktop, tablet and mobile PWA
-- Full-screen animated LUKE voice HUD
+- Full-screen animated ELP voice HUD
 - Deepgram realtime microphone, turn detection, barge-in and speech output
-- Custom OpenAI-compatible LUKE voice gateway
+- Custom OpenAI-compatible ELP voice gateway
 - Hermes-first / Together AI fallback reasoning router
 - Honcho long-term profile and session memory
 - Server-signed device identity cookie
@@ -22,7 +22,7 @@ LUKE is a cross-device, voice-first intelligence system. The home surface stays 
 Voice
 Browser microphone
   -> Deepgram Flux / Voice Agent
-  -> /api/voice/think (signed LUKE gateway)
+  -> /api/voice/think (signed ELP gateway)
   -> Hermes or Together AI
   -> Deepgram speech
   -> browser audio
@@ -34,18 +34,18 @@ ConversationText
   -> injected into future reasoning
 ```
 
-Deepgram receives only a short-lived Deepgram bearer token and a scoped LUKE gateway token. Permanent Deepgram, Together, Hermes and Honcho credentials remain server-side.
+Deepgram receives only a short-lived Deepgram bearer token and a scoped ELP gateway token. Permanent Deepgram, Together, Hermes and Honcho credentials remain server-side.
 
 ## Voice commands already wired
 
-LUKE can open/close the hidden profile interface, navigate to Memory, Signals, Skills, Briefings, Permissions or System, and query live system configuration through voice function calls.
+ELP can open/close the hidden profile interface, navigate to Memory, Signals, Skills, Briefings, Permissions or System, and query live system configuration through voice function calls.
 
-Examples: “LUKE, open memory”, “show me system status”, “open skills”, “close profile”.
+Examples: “ELP, open memory”, “show me system status”, “open skills”, “close profile”.
 
 ## Environment
 
 ```bash
-LUKE_SESSION_SECRET=
+ELP_SESSION_SECRET=
 
 HERMES_BASE_URL=
 HERMES_API_KEY=
@@ -55,14 +55,14 @@ TOGETHER_API_KEY=
 TOGETHER_MODEL=meta-llama/Llama-3.3-70B-Instruct-Turbo
 
 HONCHO_API_KEY=
-HONCHO_WORKSPACE_ID=elp-gpt-luke
+HONCHO_WORKSPACE_ID=elp-gpt
 
 DEEPGRAM_API_KEY=
-LUKE_LISTEN_MODEL=flux-general-en
-LUKE_VOICE_MODEL=aura-2-jupiter-en
+ELP_LISTEN_MODEL=flux-general-en
+ELP_VOICE_MODEL=aura-2-jupiter-en
 ```
 
-Use a dedicated random `LUKE_SESSION_SECRET` in production. If it is absent, LUKE can derive a signing secret from an already-configured server credential for development/transition purposes; the System panel reports which security mode is active.
+Use a dedicated random `ELP_SESSION_SECRET` in production. If it is absent, ELP can derive a signing secret from an already-configured server credential for development/transition purposes; the System panel reports which security mode is active.
 
 ## Local development
 
@@ -74,4 +74,4 @@ npm run dev
 
 ## Next production layer
 
-The next milestone is external action execution: authenticated account linking, scoped tool connectors, durable approval ledger, proactive jobs/briefings, notifications, observability, and end-to-end tests. LUKE must never report an external action as completed without a verified tool result.
+The next milestone is external action execution: authenticated account linking, scoped tool connectors, durable approval ledger, proactive jobs/briefings, notifications, observability, and end-to-end tests. ELP must never report an external action as completed without a verified tool result.

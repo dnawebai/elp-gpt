@@ -1,26 +1,26 @@
 import { sanitizeId } from '@/lib/security';
 
 export function isSingleUserOwnerMode() {
-  return process.env.LUKE_SINGLE_USER_MODE?.trim().toLowerCase() === 'true';
+  return process.env.ELP_SINGLE_USER_MODE?.trim().toLowerCase() === 'true';
 }
 
 export function getOwnerProfileId() {
   if (!isSingleUserOwnerMode()) return null;
-  return sanitizeId(process.env.LUKE_OWNER_PROFILE_ID || 'owner', 'owner');
+  return sanitizeId(process.env.ELP_OWNER_PROFILE_ID || 'owner', 'owner');
 }
 
 export function getBriefingTimezone() {
-  return process.env.LUKE_BRIEFING_TIMEZONE?.trim() || 'America/Toronto';
+  return process.env.ELP_BRIEFING_TIMEZONE?.trim() || 'America/Toronto';
 }
 
 export function getBriefingHour() {
-  const parsed = Number.parseInt(process.env.LUKE_BRIEFING_HOUR || '8', 10);
+  const parsed = Number.parseInt(process.env.ELP_BRIEFING_HOUR || '8', 10);
   return Number.isFinite(parsed) ? Math.min(23, Math.max(0, parsed)) : 8;
 }
 
 export function getBriefingEmailConfig() {
-  const enabled = process.env.LUKE_BRIEFING_EMAIL_ENABLED?.trim().toLowerCase() === 'true';
-  const recipient = process.env.LUKE_BRIEFING_EMAIL_TO?.trim() || '';
+  const enabled = process.env.ELP_BRIEFING_EMAIL_ENABLED?.trim().toLowerCase() === 'true';
+  const recipient = process.env.ELP_BRIEFING_EMAIL_TO?.trim() || '';
   return {
     enabled,
     recipient,

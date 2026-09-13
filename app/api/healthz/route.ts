@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getElpSessionSecret } from '@/lib/elp-config';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,7 +10,7 @@ function configured(value: string | undefined) {
 
 function healthPayload() {
   const checks = {
-    identity: configured(process.env.LUKE_SESSION_SECRET),
+    identity: configured(getElpSessionSecret()),
     memory: configured(process.env.HONCHO_API_KEY),
     execution: configured(process.env.COMPOSIO_API_KEY),
     voice: configured(process.env.DEEPGRAM_API_KEY),

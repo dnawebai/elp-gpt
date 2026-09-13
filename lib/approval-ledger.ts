@@ -42,7 +42,7 @@ export type ApprovalLedger = {
 const STATUS_VALUES = new Set<ApprovalStatus>(['proposed', 'approved', 'executing', 'executed', 'rejected', 'failed', 'expired']);
 
 function workspaceId() {
-  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke';
+  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt';
 }
 
 function clip(value: string, max: number) {
@@ -58,10 +58,10 @@ async function getApprovalSession(profileId: string) {
     environment: 'production',
   });
   const user = await honcho.peer(`user-${profileId}`);
-  const luke = await honcho.peer('luke');
+  const elp = await honcho.peer('elp');
   const session = await honcho.session(`approvals-${profileId}`);
-  await session.addPeers([user, luke]);
-  return { user, luke, session };
+  await session.addPeers([user, elp]);
+  return { user, elp, session };
 }
 
 function metadataString(metadata: Record<string, unknown>, key: string) {
@@ -141,7 +141,7 @@ export async function recordActionProposal(profileId: string, input: {
   if (!handles) return null;
   const timestamp = new Date().toISOString();
   const created = await handles.session.addMessages([{
-    peerId: handles.luke.id,
+    peerId: handles.elp.id,
     content: `[APPROVAL_PROPOSAL] ${timestamp}\n${clip(input.summary, 500)}`,
     metadata: {
       jarbisApproval: true,

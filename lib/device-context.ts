@@ -1,4 +1,4 @@
-export type LukeDeviceContext = {
+export type ElpDeviceContext = {
   capturedAt: string;
   timezone?: string;
   locale?: string;
@@ -14,11 +14,11 @@ export type LukeDeviceContext = {
   };
 };
 
-export function sanitizeDeviceContext(value: unknown): LukeDeviceContext | null {
+export function sanitizeDeviceContext(value: unknown): ElpDeviceContext | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const input = value as Record<string, unknown>;
   const capturedAt = typeof input.capturedAt === 'string' ? input.capturedAt.slice(0, 64) : new Date().toISOString();
-  const result: LukeDeviceContext = { capturedAt };
+  const result: ElpDeviceContext = { capturedAt };
 
   if (typeof input.timezone === 'string' && input.timezone.length <= 80) result.timezone = input.timezone;
   if (typeof input.locale === 'string' && input.locale.length <= 40) result.locale = input.locale;
@@ -54,7 +54,7 @@ export function sanitizeDeviceContext(value: unknown): LukeDeviceContext | null 
   return result;
 }
 
-export function deviceContextToPrompt(context: LukeDeviceContext | null) {
+export function deviceContextToPrompt(context: ElpDeviceContext | null) {
   if (!context) return '';
   const lines = [
     `Captured: ${context.capturedAt}`,

@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   const profileId = getOwnerProfileId();
   if (!profileId) {
     return NextResponse.json(
-      { ok: false, error: 'Autonomous briefing requires LUKE_SINGLE_USER_MODE=true.' },
+      { ok: false, error: 'Autonomous briefing requires ELP_SINGLE_USER_MODE=true.' },
       { status: 503 },
     );
   }

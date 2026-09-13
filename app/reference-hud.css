@@ -1,6 +1,6 @@
 /* Reference HUD redesign — inspired by the supplied cyan/black interface artwork.
    This file intentionally overrides only the public voice surface; profile/system
-   panels and LUKE's existing voice/action logic remain unchanged. */
+   panels and ELP's existing voice/action logic remain unchanged. */
 
 :root {
   --cyan: #00f6ff;
@@ -21,7 +21,7 @@ body {
     linear-gradient(180deg, #00090b 0%, #001114 48%, #000709 100%);
 }
 
-.luke-shell {
+.elp-shell {
   background:
     linear-gradient(135deg, transparent 0 13%, rgba(0, 239, 255, .065) 13.3%, transparent 18%),
     linear-gradient(315deg, transparent 0 11%, rgba(0, 239, 255, .07) 11.4%, transparent 18%),
@@ -71,7 +71,7 @@ body {
 }
 
 /* Dense central targeting/circuit field. */
-.luke-shell::before {
+.elp-shell::before {
   content: "";
   position: absolute;
   width: min(1220px, 145vw);
@@ -109,7 +109,7 @@ body {
 }
 
 /* Hexagonal/circuit motifs across the field. */
-.luke-shell::after {
+.elp-shell::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -405,11 +405,11 @@ body {
     margin-top: -22px;
   }
 
-  .luke-shell::before {
+  .elp-shell::before {
     width: 152vw;
   }
 
-  .luke-shell::after {
+  .elp-shell::after {
     opacity: .28;
     background-size: 135px 117px, 56px 56px, 56px 56px;
   }

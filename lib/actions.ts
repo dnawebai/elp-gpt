@@ -101,5 +101,5 @@ export function sanitizeActionArguments(value: unknown): Record<string, unknown>
 export function approvalCopy(risk: ActionRisk) {
   if (risk === 'high') return 'Explicit approval required before this consequential action can run.';
   if (risk === 'write') return 'Approval required before this action changes an external system.';
-  return 'Read-only action. LUKE may execute this when it directly serves the user request.';
+  return 'Read-only action. ELP may execute this when it directly serves the user request.';
 }

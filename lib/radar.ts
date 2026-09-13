@@ -6,7 +6,7 @@ import {
   type ExecutiveArtifactKind,
   type ExecutiveLedger,
 } from '@/lib/executive-memory';
-import { getReasoningProviders } from '@/lib/luke';
+import { getReasoningProviders } from '@/lib/elp';
 import { runOperatorMission, type OperatorMissionResult, type OperatorMissionState } from '@/lib/operator';
 
 export type RadarSignalType = 'opportunity' | 'risk' | 'deadline' | 'relationship' | 'contradiction' | 'dependency';
@@ -76,7 +76,7 @@ const STATUSES = new Set<RadarSignalStatus>(['open', 'acknowledged', 'dismissed'
 const severityRank: Record<RadarSeverity, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
 function workspaceId() {
-  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke';
+  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt';
 }
 
 function clip(value: string, max: number) {
@@ -123,10 +123,10 @@ async function getRadarSession(profileId: string) {
     environment: 'production',
   });
   const user = await honcho.peer(`user-${profileId}`);
-  const luke = await honcho.peer('luke');
+  const elp = await honcho.peer('elp');
   const session = await honcho.session(`radar-${profileId}`);
-  await session.addPeers([user, luke]);
-  return { user, luke, session };
+  await session.addPeers([user, elp]);
+  return { user, elp, session };
 }
 
 function parseSignal(message: { id: string; content: string; createdAt: string; metadata: Record<string, unknown> }): RadarSignal | null {
@@ -434,7 +434,7 @@ async function persistScan(args: {
     }
 
     await handles.session.addMessages([{
-      peerId: handles.luke.id,
+      peerId: handles.elp.id,
       content: `[RADAR][${signal.type.toUpperCase()}][${signal.severity.toUpperCase()}] ${generatedAt}\n${signal.title}\n${signal.summary}`,
       metadata: {
         jarbisRadarSignal: true,
@@ -459,7 +459,7 @@ async function persistScan(args: {
   }
 
   await handles.session.addMessages([{
-    peerId: handles.luke.id,
+    peerId: handles.elp.id,
     content: `[RADAR_SCAN] ${generatedAt}\n${args.summary}`,
     metadata: {
       jarbisRadarScan: true,
@@ -479,7 +479,7 @@ export async function scanOpportunityRadar(args: {
   timezone?: string;
   runKey?: string;
 }): Promise<RadarScanResult> {
-  const timezone = args.timezone?.trim() || process.env.LUKE_BRIEFING_TIMEZONE?.trim() || 'America/Toronto';
+  const timezone = args.timezone?.trim() || process.env.ELP_BRIEFING_TIMEZONE?.trim() || 'America/Toronto';
   const runKey = args.runKey?.trim() || `manual-${new Date().toISOString()}`;
   const ledger = await getExecutiveLedger(args.profileId);
   const objective = radarObjective(timezone, ledger);

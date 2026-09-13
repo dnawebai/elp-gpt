@@ -1,3 +1,5 @@
+import { getElpOwnerAccountBindings } from '@/lib/elp-config';
+
 const DEFAULT_BASE_URL = 'https://backend.composio.dev/api/v3.1';
 
 export type ComposioToolSummary = {
@@ -17,7 +19,7 @@ function getConfig() {
 }
 
 function configuredToolkitAllowlist() {
-  const value = process.env.LUKE_ALLOWED_TOOLKITS?.trim();
+  const value = process.env.ELP_ALLOWED_TOOLKITS?.trim();
   if (!value) return null;
   const items = value
     .split(',')
@@ -27,15 +29,15 @@ function configuredToolkitAllowlist() {
 }
 
 function isOwnerModeEnabled() {
-  return process.env.LUKE_SINGLE_USER_MODE?.trim().toLowerCase() === 'true';
+  return process.env.ELP_SINGLE_USER_MODE?.trim().toLowerCase() === 'true';
 }
 
 function configuredOwnerUserId() {
-  return process.env.LUKE_COMPOSIO_OWNER_USER_ID?.trim() || null;
+  return process.env.ELP_COMPOSIO_OWNER_USER_ID?.trim() || null;
 }
 
 function configuredOwnerAccountBindings() {
-  const raw = process.env.LUKE_COMPOSIO_OWNER_ACCOUNT_BINDINGS?.trim();
+  const raw = getElpOwnerAccountBindings();
   const bindings = new Map<string, string>();
   if (!raw) return bindings;
 
@@ -170,13 +172,13 @@ export async function executeComposioTool(args: {
   connectedAccountId?: string;
 }) {
   if (!isToolkitAllowed(args.toolSlug)) {
-    throw new Error('This toolkit is not allowed by the current LUKE deployment policy.');
+    throw new Error('This toolkit is not allowed by the current ELP deployment policy.');
   }
 
   const identityHealth = getComposioIdentityHealth();
   if (!identityHealth.ready) {
     throw new Error(
-      'LUKE_SINGLE_USER_MODE is enabled but no Composio owner user or connected-account bindings are configured. Refusing ambiguous execution.',
+      'ELP_SINGLE_USER_MODE is enabled but no Composio owner user or connected-account bindings are configured. Refusing ambiguous execution.',
     );
   }
 

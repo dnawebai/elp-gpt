@@ -139,7 +139,7 @@ function emptyLedger(configured = false): ExecutiveLedger {
 }
 
 function workspaceId() {
-  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke';
+  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt';
 }
 
 async function getExecutiveSession(profileId: string) {
@@ -152,10 +152,10 @@ async function getExecutiveSession(profileId: string) {
   });
 
   const user = await honcho.peer(`user-${profileId}`);
-  const luke = await honcho.peer('luke');
+  const elp = await honcho.peer('elp');
   const session = await honcho.session(`executive-${profileId}`);
-  await session.addPeers([user, luke]);
-  return { user, luke, session };
+  await session.addPeers([user, elp]);
+  return { user, elp, session };
 }
 
 function clip(value: string, max: number) {
@@ -442,7 +442,7 @@ export async function captureExecutiveArtifacts(profileId: string, content: stri
     }]);
     return { saved: true, kinds };
   } catch (error) {
-    console.error('LUKE executive memory capture failed', error);
+    console.error('ELP executive memory capture failed', error);
     return { saved: false, kinds };
   }
 }
@@ -537,7 +537,7 @@ export async function updateExecutiveLedgerItem(profileId: string, messageId: st
   if (eventParts.length) {
     const timestamp = new Date().toISOString();
     await handles.session.addMessages([{
-      peerId: handles.luke.id,
+      peerId: handles.elp.id,
       content: `[LEDGER_UPDATE] ${timestamp}\n${messageId}: ${eventParts.join('; ')}`,
       metadata: { jarbisLedgerEvent: true, targetMessageId: messageId, updatedAt: timestamp },
     }]);
@@ -564,7 +564,7 @@ export async function getExecutiveLedger(profileId: string): Promise<ExecutiveLe
       stats: ledgerStats(items),
     };
   } catch (error) {
-    console.error('LUKE executive ledger read failed', error);
+    console.error('ELP executive ledger read failed', error);
     return emptyLedger(true);
   }
 }
@@ -614,7 +614,7 @@ export async function getExecutiveMemorySnapshot(profileId: string): Promise<Exe
       summary,
     };
   } catch (error) {
-    console.error('LUKE executive memory read failed', error);
+    console.error('ELP executive memory read failed', error);
     return empty(true);
   }
 }

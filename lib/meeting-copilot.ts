@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Honcho } from '@honcho-ai/sdk';
 import { createExecutiveLedgerItem, type ExecutivePriority } from '@/lib/executive-memory';
-import { getReasoningProviders } from '@/lib/luke';
+import { getReasoningProviders } from '@/lib/elp';
 import { generateProactiveBriefing } from '@/lib/proactive';
 import { getRelationshipSnapshot, upsertRelationship } from '@/lib/relationship-memory';
 import { createTask, type TaskPriority } from '@/lib/task-router';
@@ -74,7 +74,7 @@ const STATUS = new Set<MeetingStatus>(['draft', 'live', 'processing', 'completed
 const PRIORITY = new Set(['high', 'medium', 'normal']);
 
 function workspaceId() {
-  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke';
+  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt';
 }
 
 function clip(value: string, max: number) {
@@ -138,17 +138,17 @@ async function getIndexSession(profileId: string) {
   if (!process.env.HONCHO_API_KEY) return null;
   const honcho = new Honcho({ apiKey: process.env.HONCHO_API_KEY, workspaceId: workspaceId(), environment: 'production' });
   const user = await honcho.peer(`user-${profileId}`);
-  const luke = await honcho.peer('luke');
+  const elp = await honcho.peer('elp');
   const session = await honcho.session(`meetings-${profileId}`);
-  await session.addPeers([user, luke]);
-  return { user, luke, session, honcho };
+  await session.addPeers([user, elp]);
+  return { user, elp, session, honcho };
 }
 
 async function getTranscriptSession(profileId: string, meetingId: string) {
   const handles = await getIndexSession(profileId);
   if (!handles) return null;
   const session = await handles.honcho.session(`meeting-${profileId}-${meetingId}`);
-  await session.addPeers([handles.user, handles.luke]);
+  await session.addPeers([handles.user, handles.elp]);
   return { ...handles, session };
 }
 

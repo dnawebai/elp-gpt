@@ -19,7 +19,7 @@ export type ChatMessage = {
   [key: string]: unknown;
 };
 
-export const LUKE_SYSTEM_PROMPT = `You are LUKE, the voice-first intelligence system for ELP GPT.
+export const ELP_SYSTEM_PROMPT = `You are ELP, the voice-first intelligence system for ELP GPT.
 
 Relationship and manner:
 - The primary user is your principal. Address him as "Sir" by default.
@@ -30,7 +30,7 @@ Relationship and manner:
 - Be warm but restrained. A touch of dry wit is acceptable when appropriate, but never become theatrical, camp, aristocratic, or a caricature.
 - Avoid expressions such as "guv'nor", "old chap", or exaggerated British slang.
 - Respect does not mean blind agreement. If the user's assumption is wrong, a plan is risky, or a better course exists, say so tactfully and clearly.
-- Never imitate or quote a fictional assistant. LUKE is an original ELP GPT system.
+- Never imitate or quote a fictional assistant. ELP is an original ELP GPT system.
 
 Operating style:
 - Speak naturally, calmly, precisely, and with quiet confidence.
@@ -99,7 +99,7 @@ export function getReasoningProvider(): ReasoningProvider | null {
   return getReasoningProviders()[0] || null;
 }
 
-export async function buildLukeSystemPrompt(profileId: string, sessionId: string) {
+export async function buildElpSystemPrompt(profileId: string, sessionId: string) {
   const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes] = await Promise.all([
     getMemorySnapshot(profileId, sessionId),
     getExecutiveMemorySnapshot(profileId),
@@ -117,10 +117,10 @@ export async function buildLukeSystemPrompt(profileId: string, sessionId: string
   const notificationText = notificationCenterToPrompt(notifications);
   const outcomeText = meetingOutcomeSnapshotToPrompt(meetingOutcomes);
   const sections = [
-    LUKE_SYSTEM_PROMPT,
+    ELP_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
     lifeOperatorPrompt(),
-    `AVAILABLE LUKE SKILLS:\n${skillsToPrompt()}`,
+    `AVAILABLE ELP SKILLS:\n${skillsToPrompt()}`,
     notificationText ? `PRIORITY NOTIFICATIONS:\n${notificationText}` : '',
     taskText ? `LIVE COMMAND CENTER:\n${taskText}` : '',
     relationshipText ? `LIVE RELATIONSHIP INTELLIGENCE:\n${relationshipText}` : '',
@@ -132,7 +132,7 @@ export async function buildLukeSystemPrompt(profileId: string, sessionId: string
   return sections.join('\n\n');
 }
 
-export async function runLuke(args: {
+export async function runElp(args: {
   messages: ChatMessage[];
   profileId: string;
   sessionId: string;
@@ -142,7 +142,7 @@ export async function runLuke(args: {
     throw new Error('No reasoning provider configured. Set HERMES_BASE_URL or TOGETHER_API_KEY.');
   }
 
-  const system = await buildLukeSystemPrompt(args.profileId, args.sessionId);
+  const system = await buildElpSystemPrompt(args.profileId, args.sessionId);
   const history = args.messages.filter((message) => message.role !== 'system').slice(-18);
   const failures: string[] = [];
 

@@ -243,7 +243,7 @@ export async function scanRelationshipIntelligence(args: {
   timezone?: string;
   runKey?: string;
 }): Promise<RelationshipScanResult> {
-  const timezone = args.timezone?.trim() || process.env.LUKE_BRIEFING_TIMEZONE?.trim() || 'America/Toronto';
+  const timezone = args.timezone?.trim() || process.env.ELP_BRIEFING_TIMEZONE?.trim() || 'America/Toronto';
   const runKey = args.runKey?.trim() || `manual-${new Date().toISOString()}`;
   const [snapshot, ledger] = await Promise.all([getRelationshipSnapshot(args.profileId), getExecutiveLedger(args.profileId)]);
   const known = snapshot.relationships.slice(0, 30).map((record) => `${record.name}${record.organization ? ` — ${record.organization}` : ''} | ${record.strategicValue} | ${record.momentum}${record.openLoops.length ? ` | open loops: ${record.openLoops.join('; ')}` : ''}`).join('\n');

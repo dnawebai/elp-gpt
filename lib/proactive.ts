@@ -109,7 +109,7 @@ export async function generateProactiveBriefing(args: {
   meeting?: string;
   persist?: boolean;
 }): Promise<ProactiveBriefing> {
-  const timezone = args.timezone?.trim() || process.env.LUKE_BRIEFING_TIMEZONE?.trim() || 'America/Toronto';
+  const timezone = args.timezone?.trim() || process.env.ELP_BRIEFING_TIMEZONE?.trim() || 'America/Toronto';
   const objective = objectiveFor(args.kind, timezone, args.meeting);
   const result = await runReadOnlyMission({
     objective,

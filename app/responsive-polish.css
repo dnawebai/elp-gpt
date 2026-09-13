@@ -1,15 +1,15 @@
-/* Final responsive art-direction pass for LUKE.
+/* Final responsive art-direction pass for ELP.
    Goals: stronger focal hierarchy, less visual noise on wide screens, tighter
    relationship between the HUD and controls, and dedicated tablet/mobile layouts. */
 
 :root {
-  --luke-safe-top: max(22px, env(safe-area-inset-top));
-  --luke-safe-bottom: max(18px, env(safe-area-inset-bottom));
+  --elp-safe-top: max(22px, env(safe-area-inset-top));
+  --elp-safe-bottom: max(18px, env(safe-area-inset-bottom));
 }
 
 /* ---------- Desktop / wide screens ---------- */
 @media (min-width: 1181px) {
-  .luke-shell {
+  .elp-shell {
     background:
       radial-gradient(circle at 50% 47%, rgba(0, 235, 245, .075), transparent 25%),
       linear-gradient(135deg, transparent 0 13%, rgba(0, 239, 255, .045) 13.25%, transparent 18%),
@@ -17,13 +17,13 @@
       #00090b;
   }
 
-  .luke-shell::before {
+  .elp-shell::before {
     width: min(940px, 86vw, 90vh);
     top: 47.5%;
     opacity: .64;
   }
 
-  .luke-shell::after {
+  .elp-shell::after {
     opacity: .20;
     background-size: 210px 182px, 84px 84px, 84px 84px;
     -webkit-mask-image: radial-gradient(circle at 50% 48%, transparent 0 23%, #000 36%, #000 70%, transparent 90%);
@@ -104,13 +104,13 @@
 
 /* ---------- Tablet ---------- */
 @media (min-width: 801px) and (max-width: 1180px) {
-  .luke-shell::before {
+  .elp-shell::before {
     width: min(900px, 112vw, 94vh);
     top: 47.5%;
     opacity: .68;
   }
 
-  .luke-shell::after {
+  .elp-shell::after {
     opacity: .22;
     background-size: 170px 147px, 68px 68px, 68px 68px;
     -webkit-mask-image: radial-gradient(circle at 50% 48%, transparent 0 20%, #000 34%, #000 73%, transparent 91%);
@@ -173,7 +173,7 @@
     min-height: 390px;
   }
 
-  .luke-shell::before {
+  .elp-shell::before {
     width: min(780px, 86vw, 88vh);
   }
 
@@ -194,23 +194,23 @@
 @media (max-width: 800px) {
   html,
   body,
-  .luke-shell {
+  .elp-shell {
     min-height: 100svh;
   }
 
-  .luke-shell {
+  .elp-shell {
     background:
       radial-gradient(circle at 50% 43%, rgba(0, 235, 245, .09), transparent 28%),
       linear-gradient(180deg, #00080a 0%, #001014 54%, #000709 100%);
   }
 
-  .luke-shell::before {
+  .elp-shell::before {
     width: min(138vw, 760px);
     top: 43.5%;
     opacity: .68;
   }
 
-  .luke-shell::after {
+  .elp-shell::after {
     opacity: .16;
     background-size: 128px 111px, 52px 52px, 52px 52px;
     -webkit-mask-image: radial-gradient(circle at 50% 44%, transparent 0 24%, #000 38%, #000 72%, transparent 91%);
@@ -338,7 +338,7 @@
 
 /* ---------- Narrow phones ---------- */
 @media (max-width: 430px) {
-  .luke-shell::before {
+  .elp-shell::before {
     width: 148vw;
     top: 42.5%;
   }
@@ -408,7 +408,7 @@
     --hud-size: min(70vh, 54vw);
   }
 
-  .luke-shell::before {
+  .elp-shell::before {
     width: min(84vh, 70vw);
     top: 50%;
   }

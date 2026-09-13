@@ -1,6 +1,6 @@
-export type LukeSkillRisk = 'read' | 'write' | 'high';
+export type ElpSkillRisk = 'read' | 'write' | 'high';
 
-export type LukeSkill = {
+export type ElpSkill = {
   id: string;
   name: string;
   category:
@@ -18,14 +18,14 @@ export type LukeSkill = {
     | 'finance'
     | 'social';
   description: string;
-  risk: LukeSkillRisk;
+  risk: ElpSkillRisk;
   toolkits: string[];
   keywords: string[];
   examples: string[];
   requires: string[];
 };
 
-export const LUKE_SKILLS: readonly LukeSkill[] = [
+export const ELP_SKILLS: readonly ElpSkill[] = [
   {
     id: 'web-research',
     name: 'Web Research',
@@ -296,12 +296,12 @@ function normalize(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9@.+-]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-export function matchSkills(query: string, limit = 6): LukeSkill[] {
+export function matchSkills(query: string, limit = 6): ElpSkill[] {
   const q = normalize(query);
-  if (!q) return LUKE_SKILLS.slice(0, Math.max(1, Math.min(limit, 24)));
+  if (!q) return ELP_SKILLS.slice(0, Math.max(1, Math.min(limit, 24)));
   const tokens = new Set(q.split(' ').filter((token) => token.length > 1));
 
-  return LUKE_SKILLS
+  return ELP_SKILLS
     .map((skill) => {
       let score = 0;
       const name = normalize(skill.name);
@@ -326,11 +326,11 @@ export function matchSkills(query: string, limit = 6): LukeSkill[] {
 
 export function getSkill(id: string) {
   const normalized = normalize(id).replaceAll(' ', '-');
-  return LUKE_SKILLS.find((skill) => skill.id === normalized) || null;
+  return ELP_SKILLS.find((skill) => skill.id === normalized) || null;
 }
 
 export function skillsToPrompt() {
-  return LUKE_SKILLS.map((skill) => {
+  return ELP_SKILLS.map((skill) => {
     const toolkits = skill.toolkits.length ? ` Preferred toolkits: ${skill.toolkits.join(', ')}.` : '';
     return `- ${skill.id} [${skill.risk}]: ${skill.description}${toolkits}`;
   }).join('\n');

@@ -90,9 +90,9 @@ export default function RelationshipsPage() {
   const [negResult, setNegResult] = useState<NegotiationResult | null>(null);
 
   useEffect(() => {
-    const existing = window.sessionStorage.getItem('luke-session-id');
+    const existing = window.sessionStorage.getItem('elp-session-id');
     const id = existing || crypto.randomUUID();
-    if (!existing) window.sessionStorage.setItem('luke-session-id', id);
+    if (!existing) window.sessionStorage.setItem('elp-session-id', id);
     setSessionId(id);
     try { setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Toronto'); } catch {}
     void fetch('/api/identity', { method: 'POST', cache: 'no-store' }).then(() => load()).catch(() => load());
@@ -204,7 +204,7 @@ export default function RelationshipsPage() {
 
   return <main style={{minHeight:'100vh',background:'#06111f',color:'#eaf4ff',padding:'26px',fontFamily:'Inter,Arial,sans-serif'}}>
     <header style={{maxWidth:1280,margin:'0 auto 24px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:18,flexWrap:'wrap'}}>
-      <Link href="/" style={{display:'flex',alignItems:'center',gap:8,color:'#9dc9ff',textDecoration:'none'}}><ArrowLeft size={17}/> LUKE</Link>
+      <Link href="/" style={{display:'flex',alignItems:'center',gap:8,color:'#9dc9ff',textDecoration:'none'}}><ArrowLeft size={17}/> ELP</Link>
       <div style={{textAlign:'center'}}><div style={{fontSize:11,letterSpacing:2,color:'#6e9bc7'}}>JARBIS</div><h1 style={{margin:'4px 0'}}>Relationship Intelligence</h1><div style={{fontSize:12,color:'#77e0b5'}}>DOSSIERS · MOMENTUM · NEGOTIATION WHISPERER</div></div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
         <button onClick={()=>setShowAdd((value)=>!value)} style={chip}><UserPlus size={15}/> Add</button>

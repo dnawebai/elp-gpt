@@ -27,7 +27,7 @@ body {
 button { font: inherit; color: inherit; }
 button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 5px; }
 
-.luke-shell {
+.elp-shell {
   min-height: 100dvh;
   width: 100%;
   position: relative;
@@ -37,7 +37,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 5px; }
   isolation: isolate;
 }
 
-.luke-shell::before {
+.elp-shell::before {
   content: "";
   position: absolute;
   width: min(1040px, 94vw);
@@ -51,7 +51,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 5px; }
   z-index: -1;
 }
 
-.luke-shell::after {
+.elp-shell::after {
   content: "";
   position: absolute;
   inset: 0;

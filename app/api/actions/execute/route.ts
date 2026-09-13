@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Action execution failed.';
-    console.error('LUKE action execution failed', toolSlug, error);
+    console.error('ELP action execution failed', toolSlug, error);
     try {
       await recordActionFailed(profile.profileId, token.nonce, message);
     } catch (auditError) {

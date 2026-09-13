@@ -87,7 +87,7 @@ const valueRank: Record<RelationshipValue, number> = { critical: 4, high: 3, nor
 const momentumRank: Record<RelationshipMomentum, number> = { stalled: 5, cooling: 4, warming: 3, steady: 2, unknown: 1 };
 
 function workspaceId() {
-  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke';
+  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt';
 }
 
 function clip(value: string, max: number) {
@@ -113,10 +113,10 @@ async function getRelationshipSession(profileId: string) {
     environment: 'production',
   });
   const user = await honcho.peer(`user-${profileId}`);
-  const luke = await honcho.peer('luke');
+  const elp = await honcho.peer('elp');
   const session = await honcho.session(`relationships-${profileId}`);
-  await session.addPeers([user, luke]);
-  return { user, luke, session };
+  await session.addPeers([user, elp]);
+  return { user, elp, session };
 }
 
 function metadataString(metadata: Record<string, unknown>, key: string) {
@@ -342,7 +342,7 @@ export async function upsertRelationship(profileId: string, input: RelationshipU
   }
 
   const created = await handles.session.addMessages([{
-    peerId: handles.luke.id,
+    peerId: handles.elp.id,
     content: `[RELATIONSHIP] ${now}\n${name}${organization ? ` — ${organization}` : ''}`,
     metadata,
   }]);
@@ -395,7 +395,7 @@ export async function recordRelationshipScan(profileId: string, input: {
   if (!handles) throw new Error('Relationship memory is unavailable.');
   const generatedAt = new Date().toISOString();
   await handles.session.addMessages([{
-    peerId: handles.luke.id,
+    peerId: handles.elp.id,
     content: `[RELATIONSHIP_SCAN] ${generatedAt}\n${clip(input.summary, 5000)}`,
     metadata: {
       jarbisRelationshipScan: true,

@@ -56,7 +56,7 @@ function emptyBoard(configured = false): TaskBoard {
 }
 
 function workspaceId() {
-  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke';
+  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt';
 }
 
 async function getTaskSession(profileId: string) {
@@ -67,10 +67,10 @@ async function getTaskSession(profileId: string) {
     environment: 'production',
   });
   const user = await honcho.peer(`user-${profileId}`);
-  const luke = await honcho.peer('luke');
+  const elp = await honcho.peer('elp');
   const session = await honcho.session(`tasks-${profileId}`);
-  await session.addPeers([user, luke]);
-  return { user, luke, session };
+  await session.addPeers([user, elp]);
+  return { user, elp, session };
 }
 
 function metadataString(metadata: Record<string, unknown>, key: string) {
@@ -164,7 +164,7 @@ export async function createTask(profileId: string, input: {
   const title = titleFromObjective(objective);
 
   const created = await handles.session.addMessages([{
-    peerId: handles.luke.id,
+    peerId: handles.elp.id,
     content: `[TASK] ${timestamp}\n${objective}`,
     metadata: {
       jarbisTask: true,

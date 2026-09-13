@@ -1,6 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { getElpSessionSecret } from '@/lib/elp-config';
 
-export const PROFILE_COOKIE = 'luke_profile';
+export const PROFILE_COOKIE = 'elp_profile';
 
 type SecurityMode = 'dedicated' | 'service-derived' | 'development';
 type GatewayClaims = { kind: 'voice'; profileId: string; sessionId: string; exp: number };
@@ -19,9 +20,8 @@ type ActionClaims = {
 };
 
 function secretInfo(): { secret: string; mode: SecurityMode } {
-  if (process.env.LUKE_SESSION_SECRET) {
-    return { secret: process.env.LUKE_SESSION_SECRET, mode: 'dedicated' };
-  }
+  const dedicated = getElpSessionSecret();
+  if (dedicated) return { secret: dedicated, mode: 'dedicated' };
 
   const derived =
     process.env.HERMES_API_KEY ||
