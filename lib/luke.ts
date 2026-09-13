@@ -7,7 +7,6 @@ import {
 } from '@/lib/executive-memory';
 import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
 import { lifeOperatorPrompt } from '@/lib/life-operator';
-import { getRadarSnapshot, radarToPrompt } from '@/lib/radar';
 import { skillsToPrompt } from '@/lib/skills';
 
 export type ChatMessage = {
@@ -93,22 +92,19 @@ export function getReasoningProvider(): ReasoningProvider | null {
 }
 
 export async function buildLukeSystemPrompt(profileId: string, sessionId: string) {
-  const [memory, executiveMemory, executiveLedger, radar] = await Promise.all([
+  const [memory, executiveMemory, executiveLedger] = await Promise.all([
     getMemorySnapshot(profileId, sessionId),
     getExecutiveMemorySnapshot(profileId),
     getExecutiveLedger(profileId),
-    getRadarSnapshot(profileId),
   ]);
   const memoryText = memoryToPrompt(memory);
   const executiveText = executiveMemoryToPrompt(executiveMemory);
   const ledgerText = executiveLedgerToPrompt(executiveLedger);
-  const radarText = radarToPrompt(radar);
   const sections = [
     LUKE_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
     lifeOperatorPrompt(),
     `AVAILABLE LUKE SKILLS:\n${skillsToPrompt()}`,
-    radarText ? `LIVE STRATEGIC RADAR:\n${radarText}` : '',
     ledgerText ? `LIVE EXECUTIVE CONTROL LEDGER:\n${ledgerText}` : '',
     executiveText ? `EXECUTIVE MEMORY CONTEXT:\n${executiveText}` : '',
     memoryText ? `LONG-TERM MEMORY CONTEXT:\n${memoryText}` : '',
