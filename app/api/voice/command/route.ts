@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getAnticipatorySnapshot, runAnticipatoryScan } from '@/lib/anticipatory-chief-of-staff';
 import { getCommitmentFulfilmentSnapshot, runCommitmentFulfilmentCycle } from '@/lib/commitment-fulfilment';
 import { getExecutiveLedger } from '@/lib/executive-memory';
 import { prepareVoiceMeetingCalendar, prepareVoiceMeetingEmail } from '@/lib/meeting-voice-actions';
@@ -28,7 +29,9 @@ type VoiceCommand =
   | 'meeting_follow_up'
   | 'meeting_schedule'
   | 'fulfilment'
-  | 'fulfilment_run';
+  | 'fulfilment_run'
+  | 'anticipatory'
+  | 'anticipatory_run';
 
 function readProfile(request: Request) {
   const value = (request.headers.get('cookie') || '')
@@ -79,6 +82,19 @@ function compactFulfilment(records: Awaited<ReturnType<typeof getCommitmentFulfi
   }));
 }
 
+function compactForecast(snapshot: Awaited<ReturnType<typeof getAnticipatorySnapshot>>) {
+  return snapshot.risks.slice(0, 10).map((item) => ({
+    id: item.id,
+    type: item.type,
+    severity: item.severity,
+    title: item.title,
+    summary: clip(item.summary, 650),
+    recommendedAction: clip(item.recommendedAction, 500),
+    horizonHours: item.horizonHours,
+    confidence: item.confidence,
+  }));
+}
+
 export async function POST(request: Request) {
   const profile = readProfile(request);
   if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
@@ -101,7 +117,7 @@ export async function POST(request: Request) {
 
   const command = typeof body?.command === 'string' ? body.command as VoiceCommand : null;
   const allowed = new Set<VoiceCommand>([
-    'mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center', 'meeting_follow_up', 'meeting_schedule', 'fulfilment', 'fulfilment_run',
+    'mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center', 'meeting_follow_up', 'meeting_schedule', 'fulfilment', 'fulfilment_run', 'anticipatory', 'anticipatory_run',
   ]);
   if (!command || !allowed.has(command)) return NextResponse.json({ error: 'Unsupported JARBIS voice command.' }, { status: 400 });
 
@@ -118,6 +134,23 @@ export async function POST(request: Request) {
       if (!objective) return NextResponse.json({ error: 'Mission objective is required.' }, { status: 400 });
       const result = await runOperatorMission({ objective, profileId: profile.profileId, sessionId, state: null });
       return NextResponse.json({ ok: result.ok, command, status: result.status, summary: result.summary, question: result.question, pendingAction: result.pendingAction }, { headers: { 'Cache-Control': 'no-store, private' } });
+    }
+
+    if (command === 'anticipatory' || command === 'anticipatory_run') {
+      const snapshot = command === 'anticipatory_run'
+        ? await runAnticipatoryScan({ profileId: profile.profileId, sessionId: `voice-anticipatory-${sessionId}`, timezone, persist: true })
+        : await getAnticipatorySnapshot(profile.profileId);
+      const risks = compactForecast(snapshot);
+      return NextResponse.json({
+        ok: true,
+        command,
+        status: snapshot.stats.critical ? 'critical' : snapshot.stats.high ? 'attention' : 'completed',
+        stats: snapshot.stats,
+        generatedAt: snapshot.generatedAt,
+        risks,
+        summary: snapshot.forwardScanSummary ? clip(snapshot.forwardScanSummary, 5000) : undefined,
+        ...('createdTasks' in snapshot ? { createdTasks: snapshot.createdTasks } : {}),
+      }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
     if (command === 'meeting_follow_up') {
