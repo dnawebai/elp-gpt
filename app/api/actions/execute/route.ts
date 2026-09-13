@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { actionDigest, normalizeToolSlug, sanitizeActionArguments } from '@/lib/actions';
+import { recordActionExecuted, recordActionExecuting, recordActionFailed } from '@/lib/approval-ledger';
 import { executeComposioTool, isComposioConfigured } from '@/lib/composio';
 import { PROFILE_COOKIE, sanitizeId, verifyActionToken, verifyProfileToken } from '@/lib/security';
 
@@ -13,6 +14,15 @@ function profileFrom(request: Request) {
     .find((part) => part.startsWith(`${PROFILE_COOKIE}=`))
     ?.slice(PROFILE_COOKIE.length + 1);
   return verifyProfileToken(token);
+}
+
+function evidencePreview(value: unknown) {
+  try {
+    const text = JSON.stringify(value);
+    return text.length <= 1800 ? text : `${text.slice(0, 1800)}…`;
+  } catch {
+    return 'Execution completed; result was not serializable.';
+  }
 }
 
 export async function POST(request: Request) {
@@ -55,20 +65,34 @@ export async function POST(request: Request) {
   }
 
   try {
+    await recordActionExecuting(profile.profileId, token.nonce);
+  } catch (error) {
+    console.error('JARBIS execution-start audit failed', error);
+  }
+
+  try {
     const result = await executeComposioTool({
       toolSlug,
       arguments: argumentsValue,
       profileId: profile.profileId,
       connectedAccountId,
     });
+    try {
+      await recordActionExecuted(profile.profileId, token.nonce, evidencePreview(result));
+    } catch (error) {
+      console.error('JARBIS execution-success audit failed', error);
+    }
     return NextResponse.json({ ok: true, toolSlug, risk: token.risk, result }, {
       headers: { 'Cache-Control': 'no-store, private' },
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Action execution failed.';
     console.error('LUKE action execution failed', toolSlug, error);
-    return NextResponse.json({
-      ok: false,
-      error: error instanceof Error ? error.message : 'Action execution failed.',
-    }, { status: 502 });
+    try {
+      await recordActionFailed(profile.profileId, token.nonce, message);
+    } catch (auditError) {
+      console.error('JARBIS execution-failure audit failed', auditError);
+    }
+    return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }

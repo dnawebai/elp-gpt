@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { actionDigest, approvalCopy, classifyActionRisk, normalizeToolSlug, sanitizeActionArguments } from '@/lib/actions';
+import { recordActionProposal } from '@/lib/approval-ledger';
 import { isComposioConfigured } from '@/lib/composio';
 import { createActionToken, PROFILE_COOKIE, sanitizeId, verifyProfileToken } from '@/lib/security';
 
@@ -36,14 +38,24 @@ export async function POST(request: Request) {
   const summary = typeof body.summary === 'string' ? body.summary.trim().slice(0, 500) : toolSlug.replaceAll('_', ' ').toLowerCase();
   const risk = classifyActionRisk(toolSlug);
   const digest = actionDigest({ toolSlug, arguments: argumentsValue, connectedAccountId });
+  const nonce = randomUUID();
+  const ttlSeconds = 300;
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
   const proposalToken = createActionToken({
     stage: 'proposal',
     profileId: profile.profileId,
     sessionId,
     digest,
     risk,
-    ttlSeconds: 300,
+    nonce,
+    ttlSeconds,
   });
+
+  try {
+    await recordActionProposal(profile.profileId, { nonce, digest, sessionId, toolSlug, summary, risk, expiresAt });
+  } catch (error) {
+    console.error('JARBIS approval proposal audit failed', error);
+  }
 
   return NextResponse.json({
     configured: isComposioConfigured(),
@@ -52,6 +64,6 @@ export async function POST(request: Request) {
     requiresApproval: risk !== 'read',
     policy: approvalCopy(risk),
     proposalToken,
-    expiresInSeconds: 300,
+    expiresInSeconds: ttlSeconds,
   }, { headers: { 'Cache-Control': 'no-store, private' } });
 }

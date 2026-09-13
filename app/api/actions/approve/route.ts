@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { recordActionApproved } from '@/lib/approval-ledger';
 import { createActionToken, PROFILE_COOKIE, sanitizeId, verifyActionToken, verifyProfileToken } from '@/lib/security';
 
 export const runtime = 'nodejs';
@@ -37,6 +38,12 @@ export async function POST(request: Request) {
     nonce: proposal.nonce,
     ttlSeconds: 90,
   });
+
+  try {
+    await recordActionApproved(profile.profileId, proposal.nonce);
+  } catch (error) {
+    console.error('JARBIS approval audit failed', error);
+  }
 
   return NextResponse.json({
     approved: true,
