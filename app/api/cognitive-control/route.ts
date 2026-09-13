@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { addEvidenceRecord, saveCommandersIntent, savePersonalConstitution } from '@/lib/cognitive-policy';
 import { getCognitiveControlSnapshot } from '@/lib/cognitive-control';
-import { ensureDecisionOutcomes, evaluateDecisionOutcome, evaluateDueDecisionOutcomes } from '@/lib/decision-learning';
+import { ensureDecisionOutcomes, evaluateDecisionOutcome, evaluateDueDecisionOutcomes, getStrategyCalibration } from '@/lib/decision-learning';
 import { PROFILE_COOKIE, sanitizeId, verifyProfileToken } from '@/lib/security';
+import { persistStrategyCalibration } from '@/lib/strategy-calibration-memory';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -16,11 +17,18 @@ function readProfile(request: Request) {
   return verifyProfileToken(value);
 }
 
+async function refreshCalibration(profileId: string) {
+  const calibration = await getStrategyCalibration(profileId);
+  await persistStrategyCalibration(profileId, calibration);
+  return calibration;
+}
+
 export async function GET(request: Request) {
   const profile = readProfile(request);
   if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
   try {
     await ensureDecisionOutcomes(profile.profileId);
+    await refreshCalibration(profile.profileId).catch(() => undefined);
     const snapshot = await getCognitiveControlSnapshot(profile.profileId);
     return NextResponse.json(snapshot, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) {
@@ -70,11 +78,13 @@ export async function POST(request: Request) {
       const simulationId = typeof body?.simulationId === 'string' ? body.simulationId.trim() : '';
       if (!simulationId) return NextResponse.json({ error: 'simulationId is required.' }, { status: 400 });
       const record = await evaluateDecisionOutcome(profile.profileId, simulationId, sanitizeId(body?.sessionId, 'decision-review'));
-      return NextResponse.json({ ok: true, record });
+      const calibration = await refreshCalibration(profile.profileId);
+      return NextResponse.json({ ok: true, record, calibration });
     }
     if (action === 'evaluate-due') {
       const results = await evaluateDueDecisionOutcomes(profile.profileId, sanitizeId(body?.sessionId, 'decision-review'), 4);
-      return NextResponse.json({ ok: true, reviewed: results.length, results });
+      const calibration = await refreshCalibration(profile.profileId);
+      return NextResponse.json({ ok: true, reviewed: results.length, results, calibration });
     }
     return NextResponse.json({ error: 'Unsupported cognitive control action.' }, { status: 400 });
   } catch (error) {
