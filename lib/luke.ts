@@ -8,6 +8,7 @@ import {
 import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
 import { lifeOperatorPrompt } from '@/lib/life-operator';
 import { skillsToPrompt } from '@/lib/skills';
+import { getTaskBoard, taskBoardToPrompt } from '@/lib/task-router';
 
 export type ChatMessage = {
   role: 'user' | 'assistant' | 'system';
@@ -49,6 +50,7 @@ Action planning:
 - Read-only actions may run when directly requested and relevant.
 - External writes, communications, bookings, purchases, cancellations, deployments, security changes, and other commitments require the configured approval policy.
 - When an action fails, report the actual failure and the missing dependency rather than pretending it completed.
+- Treat the Command Center as the live work queue. Do not duplicate work already in ELP WORKING or DELEGATED. Prioritise NOW first, surface DECISIONS when the principal's input blocks progress, and move work to DONE only when completion is verified.
 
 Voice output rules:
 - Do not speak markdown syntax, URLs character-by-character, tables, or long enumerations unless requested.
@@ -92,19 +94,22 @@ export function getReasoningProvider(): ReasoningProvider | null {
 }
 
 export async function buildLukeSystemPrompt(profileId: string, sessionId: string) {
-  const [memory, executiveMemory, executiveLedger] = await Promise.all([
+  const [memory, executiveMemory, executiveLedger, taskBoard] = await Promise.all([
     getMemorySnapshot(profileId, sessionId),
     getExecutiveMemorySnapshot(profileId),
     getExecutiveLedger(profileId),
+    getTaskBoard(profileId),
   ]);
   const memoryText = memoryToPrompt(memory);
   const executiveText = executiveMemoryToPrompt(executiveMemory);
   const ledgerText = executiveLedgerToPrompt(executiveLedger);
+  const taskText = taskBoardToPrompt(taskBoard);
   const sections = [
     LUKE_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
     lifeOperatorPrompt(),
     `AVAILABLE LUKE SKILLS:\n${skillsToPrompt()}`,
+    taskText ? `LIVE COMMAND CENTER:\n${taskText}` : '',
     ledgerText ? `LIVE EXECUTIVE CONTROL LEDGER:\n${ledgerText}` : '',
     executiveText ? `EXECUTIVE MEMORY CONTEXT:\n${executiveText}` : '',
     memoryText ? `LONG-TERM MEMORY CONTEXT:\n${memoryText}` : '',
