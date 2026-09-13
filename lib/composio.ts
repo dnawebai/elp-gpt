@@ -1,4 +1,5 @@
 import { getElpOwnerAccountBindings } from '@/lib/elp-config';
+import { findActiveProfileConnection } from '@/lib/connections';
 
 const DEFAULT_BASE_URL = 'https://backend.composio.dev/api/v3.1';
 
@@ -59,6 +60,12 @@ function resolveOwnerConnectedAccountId(toolSlug: string) {
     .filter((toolkit) => normalized === toolkit || normalized.startsWith(`${toolkit}_`))
     .sort((a, b) => b.length - a.length)[0];
   return matchingToolkit ? bindings.get(matchingToolkit) || null : null;
+}
+
+function toolkitFromToolSlug(toolSlug: string) {
+  const normalized = toolSlug.trim().toLowerCase();
+  const separator = normalized.indexOf('_');
+  return separator > 0 ? normalized.slice(0, separator) : normalized;
 }
 
 export function getComposioIdentityMode(): ComposioIdentityMode {
@@ -175,14 +182,20 @@ export async function executeComposioTool(args: {
     throw new Error('This toolkit is not allowed by the current ELP deployment policy.');
   }
 
+  const toolkit = toolkitFromToolSlug(args.toolSlug);
+  const profileConnection = args.connectedAccountId ? null : await findActiveProfileConnection(args.profileId, toolkit).catch(() => null);
+  const connectedAccountId =
+    args.connectedAccountId ||
+    profileConnection?.id ||
+    resolveOwnerConnectedAccountId(args.toolSlug);
+
   const identityHealth = getComposioIdentityHealth();
-  if (!identityHealth.ready) {
+  if (!connectedAccountId && !identityHealth.ready) {
     throw new Error(
-      'ELP_SINGLE_USER_MODE is enabled but no Composio owner user or connected-account bindings are configured. Refusing ambiguous execution.',
+      'ELP single-user mode has no matching profile connection or owner binding for this toolkit. Refusing ambiguous execution.',
     );
   }
 
-  const connectedAccountId = args.connectedAccountId || resolveOwnerConnectedAccountId(args.toolSlug);
   const ownerUserId = configuredOwnerUserId();
   const body: Record<string, unknown> = {
     arguments: args.arguments,
@@ -193,11 +206,10 @@ export async function executeComposioTool(args: {
     body.connected_account_id = connectedAccountId;
   }
 
-  // For an explicitly bound authenticated account, Composio can resolve auth by
-  // connected_account_id alone. Omitting a mismatched user_id prevents private
-  // account scoping failures. No-auth tools still receive a profile/user ID.
-  if (!connectedAccountId || ownerUserId) {
+  if (!connectedAccountId) {
     body.user_id = ownerUserId || args.profileId;
+  } else if (ownerUserId && connectedAccountId === resolveOwnerConnectedAccountId(args.toolSlug)) {
+    body.user_id = ownerUserId;
   }
 
   return request(`/tools/execute/${encodeURIComponent(args.toolSlug)}`, {
