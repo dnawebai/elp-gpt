@@ -3,6 +3,7 @@ import { getAnticipatorySnapshot } from '@/lib/anticipatory-chief-of-staff';
 import { getLatestCapacityPlan } from '@/lib/capacity-memory';
 import { persistDailyOperatingPlan, type DailyOperatingPlan, type PriorityHorizon, type PriorityItem } from '@/lib/daily-plan-memory';
 import { getExecutiveLedger } from '@/lib/executive-memory';
+import { getNotificationCenter } from '@/lib/notification-store';
 import { getPortfolioSnapshot } from '@/lib/portfolio-control';
 import { getRelationshipSnapshot } from '@/lib/relationship-memory';
 import { getTaskBoard } from '@/lib/task-router';
@@ -34,13 +35,14 @@ function stripInternal(item: PriorityItem & { base?: number; dueInDays?: number 
 }
 
 export async function runDynamicPriorityEngine(args: { profileId: string; persist?: boolean }) {
-  const [board, ledger, portfolio, relationships, anticipatory, capacity] = await Promise.all([
+  const [board, ledger, portfolio, relationships, anticipatory, capacity, notifications] = await Promise.all([
     getTaskBoard(args.profileId),
     getExecutiveLedger(args.profileId),
     getPortfolioSnapshot(args.profileId),
     getRelationshipSnapshot(args.profileId),
     getAnticipatorySnapshot(args.profileId),
     getLatestCapacityPlan(args.profileId),
+    getNotificationCenter(args.profileId),
   ]);
 
   const candidates: PriorityItem[] = [];
@@ -128,6 +130,19 @@ export async function runDynamicPriorityEngine(args: { profileId: string; persis
       priority: risk.severity === 'critical' ? 'critical' : risk.severity === 'high' ? 'high' : 'normal', blocked: risk.type === 'dependency_block', approvalRequired: risk.type === 'decision_bottleneck' || risk.type === 'relationship_followup',
       reasons: [risk.summary, ...risk.evidence.slice(0, 2)], recommendedAction: risk.recommendedAction,
       base: 20 + severityPoints(risk.severity), strategic: Math.round(risk.confidence * 10),
+    });
+    candidates.push(stripInternal(ranked));
+  }
+
+  for (const notification of notifications.notifications.filter((item) => item.status === 'unread' && (item.severity === 'critical' || item.severity === 'high'))) {
+    const approvalRequired = notification.kind === 'approval';
+    const ranked = rankItem({
+      id: `notification:${notification.id}`, source: 'notification', sourceId: notification.id, title: notification.title,
+      priority: notification.severity, blocked: notification.kind === 'failure', approvalRequired,
+      reasons: [`Unread ${notification.severity} ${notification.kind} notification.`, notification.summary],
+      recommendedAction: notification.action || (approvalRequired ? 'Review and decide the pending approval.' : 'Inspect the exception and take the smallest reversible next action.'),
+      base: notification.severity === 'critical' ? 42 : 28,
+      strategic: notification.kind === 'failure' ? 10 : notification.kind === 'deadline' ? 8 : notification.kind === 'approval' ? 6 : 2,
     });
     candidates.push(stripInternal(ranked));
   }
