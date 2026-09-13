@@ -1,4 +1,5 @@
 import { Honcho } from '@honcho-ai/sdk';
+import { listHonchoMessages } from '@/lib/honcho-pagination';
 
 export type PriorityHorizon = 'now' | 'today' | 'week';
 export type PrioritySource = 'task' | 'goal' | 'commitment' | 'delegation' | 'relationship' | 'risk' | 'capacity' | 'notification';
@@ -69,13 +70,20 @@ export async function persistDailyOperatingPlan(profileId: string, plan: DailyOp
   return plan;
 }
 
-export async function getLatestDailyOperatingPlan(profileId: string) {
+export async function listDailyOperatingPlans(profileId: string, limit = 100) {
   const handles = await getSession(profileId);
-  if (!handles) return null;
+  if (!handles) return [] as DailyOperatingPlan[];
   try {
-    const page = await handles.session.messages({ size: 40, reverse: true });
-    return page.items.map((item) => parsePlan(item.metadata || {})).find((item): item is DailyOperatingPlan => Boolean(item)) || null;
-  } catch { return null; }
+    const messages = await listHonchoMessages(handles.session, { pageSize: 100, maxPages: Math.ceil(Math.max(1, Math.min(limit, 2000)) / 100), reverse: true });
+    return messages.map((item) => parsePlan(item.metadata || {})).filter((item): item is DailyOperatingPlan => Boolean(item)).slice(0, limit);
+  } catch {
+    return [] as DailyOperatingPlan[];
+  }
+}
+
+export async function getLatestDailyOperatingPlan(profileId: string) {
+  const plans = await listDailyOperatingPlans(profileId, 1);
+  return plans[0] || null;
 }
 
 export function dailyOperatingPlanToPrompt(plan: DailyOperatingPlan | null) {
