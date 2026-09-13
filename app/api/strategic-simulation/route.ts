@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cognitivePolicyToPrompt, getCognitivePolicySnapshot } from '@/lib/cognitive-policy';
 import { ensureDecisionOutcomes } from '@/lib/decision-learning';
 import { PROFILE_COOKIE, sanitizeId, verifyProfileToken } from '@/lib/security';
+import { applyStrategyCalibration } from '@/lib/strategy-score-calibration';
 import { getStoredStrategyCalibration, strategyCalibrationToPrompt } from '@/lib/strategy-calibration-memory';
 import { getStrategicSimulation, listStrategicSimulations, promoteStrategicSimulation, runStrategicSimulation } from '@/lib/strategic-simulation';
 
@@ -22,8 +23,14 @@ export async function GET(request: Request) {
   if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
   const url = new URL(request.url);
   const id = url.searchParams.get('id')?.trim();
-  const data = id ? await getStrategicSimulation(profile.profileId, id) : await listStrategicSimulations(profile.profileId);
-  return NextResponse.json({ ok: true, data }, { headers: { 'Cache-Control': 'no-store, private' } });
+  const [raw, calibration] = await Promise.all([
+    id ? getStrategicSimulation(profile.profileId, id) : listStrategicSimulations(profile.profileId),
+    getStoredStrategyCalibration(profile.profileId),
+  ]);
+  const data = Array.isArray(raw)
+    ? raw.map((simulation) => applyStrategyCalibration(simulation, calibration))
+    : raw ? applyStrategyCalibration(raw, calibration) : raw;
+  return NextResponse.json({ ok: true, data, calibrationApplied: Boolean(calibration && calibration.resolvedDecisions >= 3) }, { headers: { 'Cache-Control': 'no-store, private' } });
 }
 
 export async function POST(request: Request) {
@@ -65,7 +72,7 @@ export async function POST(request: Request) {
       cognitivePolicyToPrompt(policy),
       strategyCalibrationToPrompt(calibration),
     ].filter(Boolean).join('\n\n');
-    const simulation = await runStrategicSimulation({
+    const rawSimulation = await runStrategicSimulation({
       decision,
       objective: typeof body?.objective === 'string' ? body.objective : undefined,
       context: enrichedContext || undefined,
@@ -74,7 +81,8 @@ export async function POST(request: Request) {
       sessionId: sanitizeId(body?.sessionId, 'strategic-simulation'),
       persist: true,
     });
-    return NextResponse.json({ ok: true, simulation, cognitiveContextApplied: Boolean(policy.constitution || policy.intent || policy.evidence.length || calibration) }, { headers: { 'Cache-Control': 'no-store, private' } });
+    const simulation = applyStrategyCalibration(rawSimulation, calibration);
+    return NextResponse.json({ ok: true, simulation, calibrationApplied: Boolean(calibration && calibration.resolvedDecisions >= 3), cognitiveContextApplied: Boolean(policy.constitution || policy.intent || policy.evidence.length || calibration) }, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Strategic simulation failed.' }, { status: 500 });
   }

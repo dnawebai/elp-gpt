@@ -1,51 +1,25 @@
 import { Honcho } from '@honcho-ai/sdk';
 import type { PriorityItem } from '@/lib/daily-plan-memory';
+import { listHonchoMessages } from '@/lib/honcho-pagination';
 
 export type FocusBlockKind = 'deep_work' | 'decision' | 'prep' | 'follow_up' | 'buffer' | 'admin';
 export type FocusBlockState = 'proposed' | 'active' | 'completed' | 'skipped';
-
-export type ExecutionSchedulePolicy = {
-  dayStartHour: number;
-  dayEndHour: number;
-  defaultFocusMinutes: number;
-  minimumFocusMinutes: number;
-  transitionBufferMinutes: number;
-  meetingPrepMinutes: number;
-  maxDeepWorkBlocks: number;
-  protectDeepWork: boolean;
-  timezone: string;
-  updatedAt: string;
-};
-
+export type ExecutionSchedulePolicy = { dayStartHour: number; dayEndHour: number; defaultFocusMinutes: number; minimumFocusMinutes: number; transitionBufferMinutes: number; meetingPrepMinutes: number; maxDeepWorkBlocks: number; protectDeepWork: boolean; timezone: string; updatedAt: string };
 export type BusyInterval = { start: string; end: string; title?: string; allDay?: boolean; source?: string };
 export type FocusBlock = { id: string; kind: FocusBlockKind; state: FocusBlockState; title: string; start: string; end: string; durationMinutes: number; priorityScore: number; source?: PriorityItem['source'] | 'calendar' | 'system'; sourceId?: string; approvalRequired: boolean; reason: string; recommendedAction?: string };
-export type ExecutionSchedule = {
-  id: string; generatedAt: string; date: string; timezone: string; calendarAvailable: boolean; calendarSource?: string; policy: ExecutionSchedulePolicy; busy: BusyInterval[]; blocks: FocusBlock[]; currentBlockId?: string; nextBlockId?: string; unscheduled: PriorityItem[];
-  stats: { focusMinutes: number; deepWorkMinutes: number; prepMinutes: number; bufferMinutes: number; scheduledPriorities: number; unscheduledPriorities: number; calendarConflicts: number };
-};
+export type ExecutionSchedule = { id: string; generatedAt: string; date: string; timezone: string; calendarAvailable: boolean; calendarSource?: string; policy: ExecutionSchedulePolicy; busy: BusyInterval[]; blocks: FocusBlock[]; currentBlockId?: string; nextBlockId?: string; unscheduled: PriorityItem[]; stats: { focusMinutes: number; deepWorkMinutes: number; prepMinutes: number; bufferMinutes: number; scheduledPriorities: number; unscheduledPriorities: number; calendarConflicts: number } };
 
 function workspaceId() { return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt'; }
-async function getSession(profileId: string) {
-  if (!process.env.HONCHO_API_KEY) return null;
-  const honcho = new Honcho({ apiKey: process.env.HONCHO_API_KEY, workspaceId: workspaceId(), environment: 'production' });
-  const user = await honcho.peer(`user-${profileId}`); const elp = await honcho.peer('elp'); const session = await honcho.session(`execution-schedule-${profileId}`); await session.addPeers([user, elp]); return { user, elp, session };
-}
+async function getSession(profileId: string) { if (!process.env.HONCHO_API_KEY) return null; const honcho = new Honcho({ apiKey: process.env.HONCHO_API_KEY, workspaceId: workspaceId(), environment: 'production' }); const user = await honcho.peer(`user-${profileId}`); const elp = await honcho.peer('elp'); const session = await honcho.session(`execution-schedule-${profileId}`); await session.addPeers([user, elp]); return { user, elp, session }; }
 
-export function defaultExecutionSchedulePolicy(): ExecutionSchedulePolicy {
-  return { dayStartHour: 8, dayEndHour: 19, defaultFocusMinutes: 75, minimumFocusMinutes: 30, transitionBufferMinutes: 15, meetingPrepMinutes: 20, maxDeepWorkBlocks: 4, protectDeepWork: true, timezone: process.env.ELP_BRIEFING_TIMEZONE || 'America/Toronto', updatedAt: new Date().toISOString() };
-}
-
-function normalizePolicy(raw: Partial<ExecutionSchedulePolicy>): ExecutionSchedulePolicy {
-  const base = defaultExecutionSchedulePolicy();
-  const dayStartHour = Math.max(0, Math.min(22, Math.round(Number(raw.dayStartHour ?? base.dayStartHour))));
-  const dayEndHour = Math.max(dayStartHour + 1, Math.min(24, Math.round(Number(raw.dayEndHour ?? base.dayEndHour))));
-  return { dayStartHour, dayEndHour, defaultFocusMinutes: Math.max(30, Math.min(180, Math.round(Number(raw.defaultFocusMinutes ?? base.defaultFocusMinutes)))), minimumFocusMinutes: Math.max(15, Math.min(90, Math.round(Number(raw.minimumFocusMinutes ?? base.minimumFocusMinutes)))), transitionBufferMinutes: Math.max(0, Math.min(60, Math.round(Number(raw.transitionBufferMinutes ?? base.transitionBufferMinutes)))), meetingPrepMinutes: Math.max(0, Math.min(90, Math.round(Number(raw.meetingPrepMinutes ?? base.meetingPrepMinutes)))), maxDeepWorkBlocks: Math.max(1, Math.min(8, Math.round(Number(raw.maxDeepWorkBlocks ?? base.maxDeepWorkBlocks)))), protectDeepWork: raw.protectDeepWork !== false, timezone: typeof raw.timezone === 'string' && raw.timezone.trim() ? raw.timezone.trim().slice(0, 80) : base.timezone, updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : new Date().toISOString() };
-}
+export function defaultExecutionSchedulePolicy(): ExecutionSchedulePolicy { return { dayStartHour: 8, dayEndHour: 19, defaultFocusMinutes: 75, minimumFocusMinutes: 30, transitionBufferMinutes: 15, meetingPrepMinutes: 20, maxDeepWorkBlocks: 4, protectDeepWork: true, timezone: process.env.ELP_BRIEFING_TIMEZONE || 'America/Toronto', updatedAt: new Date().toISOString() }; }
+function normalizePolicy(raw: Partial<ExecutionSchedulePolicy>): ExecutionSchedulePolicy { const base = defaultExecutionSchedulePolicy(); const dayStartHour = Math.max(0, Math.min(22, Math.round(Number(raw.dayStartHour ?? base.dayStartHour)))); const dayEndHour = Math.max(dayStartHour + 1, Math.min(24, Math.round(Number(raw.dayEndHour ?? base.dayEndHour)))); return { dayStartHour, dayEndHour, defaultFocusMinutes: Math.max(30, Math.min(180, Math.round(Number(raw.defaultFocusMinutes ?? base.defaultFocusMinutes)))), minimumFocusMinutes: Math.max(15, Math.min(90, Math.round(Number(raw.minimumFocusMinutes ?? base.minimumFocusMinutes)))), transitionBufferMinutes: Math.max(0, Math.min(60, Math.round(Number(raw.transitionBufferMinutes ?? base.transitionBufferMinutes)))), meetingPrepMinutes: Math.max(0, Math.min(90, Math.round(Number(raw.meetingPrepMinutes ?? base.meetingPrepMinutes)))), maxDeepWorkBlocks: Math.max(1, Math.min(8, Math.round(Number(raw.maxDeepWorkBlocks ?? base.maxDeepWorkBlocks)))), protectDeepWork: raw.protectDeepWork !== false, timezone: typeof raw.timezone === 'string' && raw.timezone.trim() ? raw.timezone.trim().slice(0, 80) : base.timezone, updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : new Date().toISOString() }; }
 function parsePolicy(metadata: Record<string, unknown>) { if (metadata.jarbisExecutionSchedulePolicy !== true || typeof metadata.policyJson !== 'string') return null; try { return normalizePolicy(JSON.parse(metadata.policyJson) as Partial<ExecutionSchedulePolicy>); } catch { return null; } }
 function parseSchedule(metadata: Record<string, unknown>) { if (metadata.jarbisExecutionSchedule !== true || typeof metadata.scheduleJson !== 'string') return null; try { const value = JSON.parse(metadata.scheduleJson) as ExecutionSchedule; return value && typeof value.id === 'string' && Array.isArray(value.blocks) ? value : null; } catch { return null; } }
 
-export async function getExecutionSchedulePolicy(profileId: string) { const handles = await getSession(profileId); if (!handles) return defaultExecutionSchedulePolicy(); try { const page = await handles.session.messages({ size: 50, reverse: true }); return page.items.map((item) => parsePolicy(item.metadata || {})).find((item): item is ExecutionSchedulePolicy => Boolean(item)) || defaultExecutionSchedulePolicy(); } catch { return defaultExecutionSchedulePolicy(); } }
+export async function getExecutionSchedulePolicy(profileId: string) { const handles = await getSession(profileId); if (!handles) return defaultExecutionSchedulePolicy(); try { const messages = await listHonchoMessages(handles.session, { pageSize: 100, maxPages: 5, reverse: true }); return messages.map((item) => parsePolicy(item.metadata || {})).find((item): item is ExecutionSchedulePolicy => Boolean(item)) || defaultExecutionSchedulePolicy(); } catch { return defaultExecutionSchedulePolicy(); } }
 export async function saveExecutionSchedulePolicy(profileId: string, patch: Partial<Omit<ExecutionSchedulePolicy, 'updatedAt'>>) { const handles = await getSession(profileId); if (!handles) throw new Error('Execution schedule memory is unavailable.'); const current = await getExecutionSchedulePolicy(profileId); const next = normalizePolicy({ ...current, ...patch, updatedAt: new Date().toISOString() }); await handles.session.addMessages([{ peerId: handles.user.id, content: `[EXECUTION_SCHEDULE_POLICY] ${next.updatedAt}`, metadata: { jarbisExecutionSchedulePolicy: true, recordVersion: 1, policyJson: JSON.stringify(next) } }]); return next; }
 export async function persistExecutionSchedule(profileId: string, schedule: ExecutionSchedule) { const handles = await getSession(profileId); if (!handles) return schedule; await handles.session.addMessages([{ peerId: handles.elp.id, content: `[EXECUTION_SCHEDULE] ${schedule.date}\n${schedule.blocks.length} proposed blocks; ${schedule.unscheduled.length} unscheduled priorities.`, metadata: { jarbisExecutionSchedule: true, recordVersion: 1, scheduleId: schedule.id, generatedAt: schedule.generatedAt, scheduleJson: JSON.stringify(schedule) } }]); return schedule; }
-export async function getLatestExecutionSchedule(profileId: string) { const handles = await getSession(profileId); if (!handles) return null; try { const page = await handles.session.messages({ size: 50, reverse: true }); return page.items.map((item) => parseSchedule(item.metadata || {})).find((item): item is ExecutionSchedule => Boolean(item)) || null; } catch { return null; } }
+export async function listExecutionSchedules(profileId: string, limit = 100) { const handles = await getSession(profileId); if (!handles) return [] as ExecutionSchedule[]; try { const messages = await listHonchoMessages(handles.session, { pageSize: 100, maxPages: Math.ceil(Math.max(1, Math.min(limit, 2000)) / 100), reverse: true }); return messages.map((item) => parseSchedule(item.metadata || {})).filter((item): item is ExecutionSchedule => Boolean(item)).slice(0, limit); } catch { return [] as ExecutionSchedule[]; } }
+export async function getLatestExecutionSchedule(profileId: string) { const schedules = await listExecutionSchedules(profileId, 1); return schedules[0] || null; }
 export function executionScheduleToPrompt(schedule: ExecutionSchedule | null) { if (!schedule) return ''; const current = schedule.currentBlockId ? schedule.blocks.find((item) => item.id === schedule.currentBlockId) : undefined; const next = schedule.nextBlockId ? schedule.blocks.find((item) => item.id === schedule.nextBlockId) : undefined; const top = schedule.blocks.slice(0, 8).map((item) => `- ${item.start}–${item.end} [${item.kind}] ${item.title}`); return [`EXECUTION SCHEDULE ${schedule.date}: ${schedule.stats.focusMinutes} focus minutes across ${schedule.stats.scheduledPriorities} scheduled priorities.`, current ? `CURRENT FOCUS: ${current.title} until ${current.end}.` : '', next ? `NEXT: ${next.title} at ${next.start}.` : '', ...top, schedule.unscheduled.length ? `UNSCHEDULED MATERIAL PRIORITIES: ${schedule.unscheduled.slice(0, 5).map((item) => item.title).join('; ')}` : ''].filter(Boolean).join('\n'); }

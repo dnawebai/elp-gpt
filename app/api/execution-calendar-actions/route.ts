@@ -1,0 +1,39 @@
+import { NextResponse } from 'next/server';
+import { getLatestExecutionSchedule } from '@/lib/execution-schedule-memory';
+import { PROFILE_COOKIE, verifyProfileToken } from '@/lib/security';
+
+export const runtime = 'nodejs';
+
+function profileFrom(request: Request) {
+  const token = (request.headers.get('cookie') || '').split(';').map((part) => part.trim()).find((part) => part.startsWith(`${PROFILE_COOKIE}=`))?.slice(PROFILE_COOKIE.length + 1);
+  return verifyProfileToken(token);
+}
+
+function actionFor(block: NonNullable<Awaited<ReturnType<typeof getLatestExecutionSchedule>>>['blocks'][number], timezone: string) {
+  return {
+    toolSlug: 'GOOGLECALENDAR_CREATE_EVENT',
+    arguments: {
+      calendar_id: 'primary',
+      summary: `ELP Focus — ${block.title}`.slice(0, 240),
+      description: `Protected by ELP Mission Control. ${block.reason}${block.recommendedAction ? `\n\nObjective: ${block.recommendedAction}` : ''}`.slice(0, 4000),
+      start_datetime: block.start,
+      end_datetime: block.end,
+      timezone,
+      transparency: 'opaque',
+      visibility: 'private',
+      create_meeting_room: false,
+      exclude_organizer: true,
+      send_updates: 'none',
+      extended_properties: { private: { elpBlockId: block.id, elpSource: String(block.source || 'system') } },
+    },
+    summary: `Protect ${block.title} on Google Calendar from ${block.start} to ${block.end}`,
+  };
+}
+
+export async function GET(request: Request) {
+  const profile = profileFrom(request); if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
+  const schedule = await getLatestExecutionSchedule(profile.profileId); if (!schedule) return NextResponse.json({ actions: [], schedule: null });
+  const url = new URL(request.url); const blockId = url.searchParams.get('blockId');
+  const eligible = schedule.blocks.filter((block) => !['prep', 'buffer'].includes(block.kind) && Date.parse(block.end) > Date.now() && (!blockId || block.id === blockId));
+  return NextResponse.json({ scheduleId: schedule.id, actions: eligible.map((block) => ({ blockId: block.id, block, action: actionFor(block, schedule.timezone) })) }, { headers: { 'Cache-Control': 'no-store, private' } });
+}
