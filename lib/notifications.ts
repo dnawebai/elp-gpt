@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { getAnticipatorySnapshot } from '@/lib/anticipatory-chief-of-staff';
 import { getApprovalLedger } from '@/lib/approval-ledger';
+import { listRecentInboundEvents } from '@/lib/event-fabric';
 import {
   getNotificationCenter,
   upsertNotificationCandidates,
@@ -37,13 +38,19 @@ function withinHours(value: string | undefined, hours: number) {
   return Number.isFinite(time) && Date.now() - time <= hours * 60 * 60 * 1000;
 }
 
+function inboundText(event: { summary?: string; metadata?: Record<string, unknown> }, key: string) {
+  const value = event.metadata?.[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : '';
+}
+
 async function collectCandidates(profileId: string): Promise<NotificationCandidate[]> {
-  const [tasks, approvals, radar, relationships, anticipatory] = await Promise.all([
+  const [tasks, approvals, radar, relationships, anticipatory, inboundEvents] = await Promise.all([
     getTaskBoard(profileId),
     getApprovalLedger(profileId),
     getRadarSnapshot(profileId),
     getRelationshipSnapshot(profileId),
     getAnticipatorySnapshot(profileId),
+    listRecentInboundEvents(profileId, 6, 100),
   ]);
   const result: NotificationCandidate[] = [];
 
@@ -56,7 +63,7 @@ async function collectCandidates(profileId: string): Promise<NotificationCandida
       summary: task.title,
       source: 'task',
       sourceId: task.id,
-      action: task.approval === 'required' ? 'Review the pending decision in Command Center.' : 'Provide the missing input so JARBIS can continue.',
+      action: task.approval === 'required' ? 'Review the pending decision in Command Center.' : 'Provide the missing input so ELP can continue.',
     });
   }
 
@@ -162,7 +169,28 @@ async function collectCandidates(profileId: string): Promise<NotificationCandida
     });
   }
 
-  return result.slice(0, 100);
+  for (const event of inboundEvents) {
+    if ((event.provider !== 'gmail' && event.provider !== 'outlook') || event.type !== 'message_received') continue;
+    const subject = inboundText(event, 'subject');
+    const sender = inboundText(event, 'sender');
+    const importance = inboundText(event, 'importance').toLowerCase();
+    const urgent = /\b(urgent|asap|action required|deadline|past due|failed|failure|security|signature required|immediate|overdue)\b/i.test(`${subject} ${event.summary || ''}`);
+    const important = event.metadata?.important === true || importance === 'high';
+    const automated = /no-?reply|mailer-daemon|newsletter|notifications?@/i.test(sender);
+    if (automated && !urgent && !important) continue;
+    const severity = urgent || important ? 'high' as const : 'normal' as const;
+    addCandidate(result, {
+      kind: 'system',
+      severity,
+      title: `${event.provider === 'gmail' ? 'Gmail' : 'Outlook'} message${urgent ? ' may need prompt attention' : ''}`,
+      summary: event.summary || subject || 'New inbound message.',
+      source: `communication-${event.provider}`,
+      sourceId: event.sourceId || event.id,
+      action: 'Review the message and decide whether a reply, delegation, scheduling change, or no action is appropriate.',
+    });
+  }
+
+  return result.slice(0, 140);
 }
 
 export async function refreshNotifications(profileId: string) {

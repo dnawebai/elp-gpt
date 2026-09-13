@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getLatestCapacityPlan } from '@/lib/capacity-memory';
+import { getCommunicationsSyncSnapshot } from '@/lib/communications-sync';
 import { getLatestDailyOperatingPlan } from '@/lib/daily-plan-memory';
 import { deviceAgentConfigured, listDeviceCommands } from '@/lib/device-control';
 import { ensureBaselineEventStatus, listEventSubscriptions } from '@/lib/event-fabric';
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
   const profile = profileFrom(request);
   if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
   await ensureBaselineEventStatus(profile.profileId).catch(() => undefined);
-  const [plan, schedule, interrupt, board, portfolio, capacity, relationships, notifications, ledger, radar, diff, protectedBlocks, eventSubscriptions, deviceCommands, phone] = await Promise.all([
+  const [plan, schedule, interrupt, board, portfolio, capacity, relationships, notifications, ledger, radar, diff, protectedBlocks, eventSubscriptions, communications, deviceCommands, phone] = await Promise.all([
     getLatestDailyOperatingPlan(profile.profileId),
     getLatestExecutionSchedule(profile.profileId),
     getLatestInterruptSnapshot(profile.profileId),
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
     getPlanDiff(profile.profileId),
     listProtectedBlocks(profile.profileId),
     listEventSubscriptions(profile.profileId),
+    getCommunicationsSyncSnapshot(profile.profileId),
     listDeviceCommands(profile.profileId, 30),
     getPhoneReadiness(profile.profileId),
   ]);
@@ -67,6 +69,7 @@ export async function GET(request: Request) {
     diff,
     protectedBlocks: protectedBlocks.slice(0, 100),
     eventSubscriptions,
+    communications,
     device: { agentConfigured: deviceAgentConfigured(), commands: deviceCommands },
     phone,
   }, { headers: { 'Cache-Control': 'no-store, private' } });
