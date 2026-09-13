@@ -8,6 +8,7 @@ import {
 import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
 import { lifeOperatorPrompt } from '@/lib/life-operator';
 import { getNotificationCenter, notificationCenterToPrompt } from '@/lib/notification-store';
+import { getMeetingOutcomeSnapshot, meetingOutcomeSnapshotToPrompt } from '@/lib/outcome-memory';
 import { getRelationshipSnapshot, relationshipSnapshotToPrompt } from '@/lib/relationship-memory';
 import { skillsToPrompt } from '@/lib/skills';
 import { getTaskBoard, taskBoardToPrompt } from '@/lib/task-router';
@@ -55,6 +56,7 @@ Action planning:
 - Treat the Command Center as the live work queue. Do not duplicate work already in ELP WORKING or DELEGATED. Prioritise NOW first, surface DECISIONS when the principal's input blocks progress, and move work to DONE only when completion is verified.
 - Treat unread critical/high notifications as the principal's active exception queue. Surface them when directly relevant, when the principal asks what needs attention, or when they materially change the answer. Do not repeat dismissed notifications.
 - Use relationship intelligence as decision context, not as unquestioned truth. Preserve evidence/confidence distinctions and never infer sensitive traits or recommend manipulative exploitation of a person's vulnerabilities.
+- Use meeting outcome learning to distinguish completed activity from actual results. A sent follow-up is evidence of execution, not proof of success. Apply learned patterns to future meeting preparation and negotiation only when they are supported by evidence.
 
 Voice output rules:
 - Do not speak markdown syntax, URLs character-by-character, tables, or long enumerations unless requested.
@@ -98,13 +100,14 @@ export function getReasoningProvider(): ReasoningProvider | null {
 }
 
 export async function buildLukeSystemPrompt(profileId: string, sessionId: string) {
-  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications] = await Promise.all([
+  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes] = await Promise.all([
     getMemorySnapshot(profileId, sessionId),
     getExecutiveMemorySnapshot(profileId),
     getExecutiveLedger(profileId),
     getTaskBoard(profileId),
     getRelationshipSnapshot(profileId),
     getNotificationCenter(profileId),
+    getMeetingOutcomeSnapshot(profileId),
   ]);
   const memoryText = memoryToPrompt(memory);
   const executiveText = executiveMemoryToPrompt(executiveMemory);
@@ -112,6 +115,7 @@ export async function buildLukeSystemPrompt(profileId: string, sessionId: string
   const taskText = taskBoardToPrompt(taskBoard);
   const relationshipText = relationshipSnapshotToPrompt(relationships);
   const notificationText = notificationCenterToPrompt(notifications);
+  const outcomeText = meetingOutcomeSnapshotToPrompt(meetingOutcomes);
   const sections = [
     LUKE_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
@@ -120,6 +124,7 @@ export async function buildLukeSystemPrompt(profileId: string, sessionId: string
     notificationText ? `PRIORITY NOTIFICATIONS:\n${notificationText}` : '',
     taskText ? `LIVE COMMAND CENTER:\n${taskText}` : '',
     relationshipText ? `LIVE RELATIONSHIP INTELLIGENCE:\n${relationshipText}` : '',
+    outcomeText ? `MEETING OUTCOME LEARNING:\n${outcomeText}` : '',
     ledgerText ? `LIVE EXECUTIVE CONTROL LEDGER:\n${ledgerText}` : '',
     executiveText ? `EXECUTIVE MEMORY CONTEXT:\n${executiveText}` : '',
     memoryText ? `LONG-TERM MEMORY CONTEXT:\n${memoryText}` : '',
