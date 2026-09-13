@@ -352,11 +352,11 @@ export async function deliverPriorityNotifications(profileId: string) {
 }
 
 export async function getNotificationDeliverySnapshot(profileId: string) {
-  const [preferences, subscriptions, attempts] = await Promise.all([
-    getDeliveryPreferences(profileId),
-    listPushSubscriptions(profileId),
-    listDeliveryAttempts(profileId, 120),
-  ]);
+  // Read the same Honcho delivery session sequentially. Parallel addPeers/session reads
+  // can race in the SDK and make this control-plane endpoint fail intermittently.
+  const preferences = await getDeliveryPreferences(profileId);
+  const subscriptions = await listPushSubscriptions(profileId);
+  const attempts = await listDeliveryAttempts(profileId, 120);
   return {
     preferences,
     push: { configured: webPushConfigured(), publicKey: getPushPublicKey(), subscriptions: subscriptions.length },
