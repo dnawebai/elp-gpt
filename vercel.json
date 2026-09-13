@@ -22,6 +22,10 @@
       "schedule": "7 * * * *"
     },
     {
+      "path": "/api/cron/autonomous-jobs",
+      "schedule": "11 * * * *"
+    },
+    {
       "path": "/api/cron/commitment-fulfilment",
       "schedule": "23 */2 * * *"
     },
