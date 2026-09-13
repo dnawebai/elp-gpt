@@ -12,6 +12,13 @@ import {
 } from '../lib/actions.ts';
 import { isCronAuthorised } from '../lib/cron-auth.ts';
 import { nextRunAfter, validateJobSchedule } from '../lib/job-schedule.ts';
+import {
+  DEFAULT_NOTIFICATION_DELIVERY_PREFERENCES,
+  deliveryKey,
+  isQuietHours,
+  notificationChannelDelayMinutes,
+  shouldDeliverNotification,
+} from '../lib/notification-delivery-policy.ts';
 import { operatorTaskTransition } from '../lib/task-router.ts';
 import { mintSignedToken, verifySignedToken } from '../lib/token-codec.ts';
 
@@ -112,6 +119,38 @@ test('one-time autonomous jobs never reschedule after their run time', () => {
   assert.equal(nextRunAfter(schedule, new Date('2026-09-13T16:00:00.000Z')), null);
 });
 
+test('notification escalation delays preserve channel boundaries', () => {
+  assert.equal(notificationChannelDelayMinutes({ channel: 'push', severity: 'high', kind: 'risk' }), 0);
+  assert.equal(notificationChannelDelayMinutes({ channel: 'email', severity: 'high', kind: 'approval' }), 0);
+  assert.equal(notificationChannelDelayMinutes({ channel: 'sms', severity: 'critical', kind: 'risk' }), 0);
+  assert.equal(notificationChannelDelayMinutes({ channel: 'voice', severity: 'critical', kind: 'failure' }), 10);
+  assert.equal(notificationChannelDelayMinutes({ channel: 'voice', severity: 'high', kind: 'approval' }), 60);
+  assert.equal(notificationChannelDelayMinutes({ channel: 'sms', severity: 'normal', kind: 'task' }), Number.POSITIVE_INFINITY);
+});
+
+test('quiet hours suppress non-critical delivery but never critical alerts', () => {
+  const preferences = {
+    ...DEFAULT_NOTIFICATION_DELIVERY_PREFERENCES,
+    pushEnabled: true,
+    emailEnabled: true,
+    email: 'owner@example.com',
+    timezone: 'UTC',
+    quietHoursStart: '22:00',
+    quietHoursEnd: '07:00',
+  };
+  const now = new Date('2026-09-13T23:30:00.000Z');
+  assert.equal(isQuietHours(preferences, now), true);
+  assert.equal(shouldDeliverNotification({ channel: 'email', severity: 'high', kind: 'approval', lastSeenAt: '2026-09-13T22:00:00.000Z', preferences, now }), false);
+  assert.equal(shouldDeliverNotification({ channel: 'email', severity: 'critical', kind: 'approval', lastSeenAt: '2026-09-13T22:00:00.000Z', preferences, now }), true);
+});
+
+test('notification delivery keys change with occurrence or alert update', () => {
+  const base = { id: 'note-1', occurrenceCount: 1, updatedAt: '2026-09-13T12:00:00.000Z' };
+  assert.equal(deliveryKey(base, 'push'), deliveryKey(base, 'push'));
+  assert.notEqual(deliveryKey(base, 'push'), deliveryKey({ ...base, occurrenceCount: 2 }, 'push'));
+  assert.notEqual(deliveryKey(base, 'push'), deliveryKey({ ...base, updatedAt: '2026-09-13T13:00:00.000Z' }, 'push'));
+});
+
 test('operator task transitions route approvals and verified completion correctly', () => {
   assert.deepEqual(
     operatorTaskTransition({ status: 'completed', summary: 'Verified complete.' }),
@@ -176,6 +215,12 @@ test('all autonomous cron routes use the centralized authorization guard', async
     assert.match(content, /isCronRequestAuthorised/);
     assert.doesNotMatch(content, /process\.env\.CRON_SECRET/);
   }
+});
+
+test('notification cron invokes delivery after refreshing candidates', async () => {
+  const content = await readFile(path.join(root, 'app/api/cron/notifications/route.ts'), 'utf8');
+  assert.match(content, /deliverPriorityNotifications/);
+  assert.match(content, /refreshNotifications/);
 });
 
 test('Vercel invokes the autonomous jobs runner hourly', async () => {
