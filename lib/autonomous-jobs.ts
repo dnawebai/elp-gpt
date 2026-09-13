@@ -284,7 +284,7 @@ export async function runAutonomousJob(profileId: string, job: AutonomousJob, sc
   } else if (result.status === 'needs_input' || result.status === 'blocked') {
     taskId = await createTask(profileId, { objective: job.title, queue: 'decisions', owner: 'user', priority: result.status === 'blocked' ? 'high' : 'normal', source: 'autonomous-job', summary: result.question || result.summary });
   } else if (!conditionNotMet) {
-    taskId = await createTask(profileId, { objective: job.title, queue: 'done', owner: 'ai', priority: 'normal', status: 'completed', source: 'autonomous-job', summary: result.summary });
+    taskId = await createTask(profileId, { objective: job.title, queue: 'done', owner: 'ai', priority: 'normal', source: 'autonomous-job', summary: result.summary });
   }
 
   await writeRun(profileId, job, scheduledFor, runStatus, result.summary, taskId || undefined);
