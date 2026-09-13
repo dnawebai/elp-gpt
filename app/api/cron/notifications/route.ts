@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server';
+import { isCronRequestAuthorised } from '@/lib/cron-auth';
 import { refreshNotifications } from '@/lib/notifications';
 import { getOwnerProfileId } from '@/lib/owner';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-function isAuthorised(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  return Boolean(secret) && request.headers.get('authorization') === `Bearer ${secret}`;
-}
-
 export async function GET(request: Request) {
-  if (!isAuthorised(request)) return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
+  if (!isCronRequestAuthorised(request)) return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
   const profileId = getOwnerProfileId();
   if (!profileId) {
     return NextResponse.json({ ok: false, error: 'Autonomous notifications require ELP_SINGLE_USER_MODE=true.' }, { status: 503 });
