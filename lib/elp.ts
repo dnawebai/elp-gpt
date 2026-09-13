@@ -10,6 +10,7 @@ import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
 import { lifeOperatorPrompt } from '@/lib/life-operator';
 import { getNotificationCenter, notificationCenterToPrompt } from '@/lib/notification-store';
 import { getMeetingOutcomeSnapshot, meetingOutcomeSnapshotToPrompt } from '@/lib/outcome-memory';
+import { getPortfolioSnapshot, portfolioSnapshotToPrompt } from '@/lib/portfolio-control';
 import { getRelationshipSnapshot, relationshipSnapshotToPrompt } from '@/lib/relationship-memory';
 import { skillsToPrompt } from '@/lib/skills';
 import { getStoredStrategyCalibration, strategyCalibrationToPrompt } from '@/lib/strategy-calibration-memory';
@@ -55,6 +56,8 @@ Cognitive governance:
 - Historical strategy calibration is a diagnostic signal, not truth. Weak historical forecasting dimensions should receive more scrutiny; never distort facts to fit calibration.
 - Surface material uncertainty rather than hiding it. When assumptions dominate the conclusion, identify the assumption and the evidence that would resolve it.
 - Separate activity from outcomes. Completion of an action is not evidence that the objective succeeded.
+- Treat goal hierarchy as strategic context: execution should support an active objective or explicitly explain why it is unlinked.
+- Delegation is not completion. Treat stale check-ins, blockers, overdue work and missing evidence as exceptions until progress is verified.
 
 Action planning:
 - Identify the smallest skill or combination of skills that can complete the request.
@@ -110,7 +113,7 @@ export function getReasoningProvider(): ReasoningProvider | null {
 }
 
 export async function buildElpSystemPrompt(profileId: string, sessionId: string) {
-  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes, cognitivePolicy, calibration] = await Promise.all([
+  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes, cognitivePolicy, calibration, portfolio] = await Promise.all([
     getMemorySnapshot(profileId, sessionId),
     getExecutiveMemorySnapshot(profileId),
     getExecutiveLedger(profileId),
@@ -120,6 +123,7 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
     getMeetingOutcomeSnapshot(profileId),
     getCognitivePolicySnapshot(profileId),
     getStoredStrategyCalibration(profileId),
+    getPortfolioSnapshot(profileId),
   ]);
   const memoryText = memoryToPrompt(memory);
   const executiveText = executiveMemoryToPrompt(executiveMemory);
@@ -130,11 +134,13 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
   const outcomeText = meetingOutcomeSnapshotToPrompt(meetingOutcomes);
   const cognitiveText = cognitivePolicyToPrompt(cognitivePolicy);
   const calibrationText = strategyCalibrationToPrompt(calibration);
+  const portfolioText = portfolioSnapshotToPrompt(portfolio);
   const sections = [
     ELP_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
     cognitiveText ? `COGNITIVE POLICY:\n${cognitiveText}` : '',
     calibrationText ? `DECISION CALIBRATION:\n${calibrationText}` : '',
+    portfolioText ? `PORTFOLIO CONTROL:\n${portfolioText}` : '',
     lifeOperatorPrompt(),
     `AVAILABLE ELP SKILLS:\n${skillsToPrompt()}`,
     notificationText ? `PRIORITY NOTIFICATIONS:\n${notificationText}` : '',
