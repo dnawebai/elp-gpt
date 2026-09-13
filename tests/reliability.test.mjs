@@ -11,6 +11,7 @@ import {
   sanitizeActionArguments,
 } from '../lib/actions.ts';
 import { isCronAuthorised } from '../lib/cron-auth.ts';
+import { nextRunAfter, validateJobSchedule } from '../lib/job-schedule.ts';
 import { operatorTaskTransition } from '../lib/task-router.ts';
 import { mintSignedToken, verifySignedToken } from '../lib/token-codec.ts';
 
@@ -82,6 +83,35 @@ test('cron authorization is fail-closed and exact', () => {
   assert.equal(isCronAuthorised('Bearer wrong', 'secret'), false);
 });
 
+test('autonomous job schedules validate minimum cadence and compute interval runs', () => {
+  assert.match(validateJobSchedule({ type: 'interval', everyMinutes: 30 }) || '', /60 minutes/);
+  assert.equal(validateJobSchedule({ type: 'interval', everyMinutes: 60 }), null);
+  const next = nextRunAfter(
+    { type: 'interval', everyMinutes: 60, anchorAt: '2026-09-13T12:00:00.000Z' },
+    new Date('2026-09-13T13:12:00.000Z'),
+  );
+  assert.equal(next, '2026-09-13T14:00:00.000Z');
+});
+
+test('daily autonomous job schedules honor the configured timezone', () => {
+  const next = nextRunAfter(
+    { type: 'daily', time: '08:00', timezone: 'America/Toronto' },
+    new Date('2026-09-13T10:00:00.000Z'),
+  );
+  assert.equal(next, '2026-09-13T12:00:00.000Z');
+  const tomorrow = nextRunAfter(
+    { type: 'daily', time: '08:00', timezone: 'America/Toronto' },
+    new Date('2026-09-13T13:00:00.000Z'),
+  );
+  assert.equal(tomorrow, '2026-09-14T12:00:00.000Z');
+});
+
+test('one-time autonomous jobs never reschedule after their run time', () => {
+  const schedule = { type: 'once', runAt: '2026-09-13T16:00:00.000Z' };
+  assert.equal(nextRunAfter(schedule, new Date('2026-09-13T15:00:00.000Z')), '2026-09-13T16:00:00.000Z');
+  assert.equal(nextRunAfter(schedule, new Date('2026-09-13T16:00:00.000Z')), null);
+});
+
 test('operator task transitions route approvals and verified completion correctly', () => {
   assert.deepEqual(
     operatorTaskTransition({ status: 'completed', summary: 'Verified complete.' }),
@@ -133,6 +163,8 @@ test('canonical ELP branding has no literal legacy assistant name in source path
 
 test('all autonomous cron routes use the centralized authorization guard', async () => {
   const routes = [
+    'app/api/cron/autonomous-jobs/route.ts',
+    'app/api/cron/commitment-fulfilment/route.ts',
     'app/api/cron/daily-briefing/route.ts',
     'app/api/cron/meeting-outcomes/route.ts',
     'app/api/cron/notifications/route.ts',
@@ -144,6 +176,12 @@ test('all autonomous cron routes use the centralized authorization guard', async
     assert.match(content, /isCronRequestAuthorised/);
     assert.doesNotMatch(content, /process\.env\.CRON_SECRET/);
   }
+});
+
+test('Vercel invokes the autonomous jobs runner hourly', async () => {
+  const config = JSON.parse(await readFile(path.join(root, 'vercel.json'), 'utf8'));
+  const cron = config.crons.find((entry) => entry.path === '/api/cron/autonomous-jobs');
+  assert.deepEqual(cron, { path: '/api/cron/autonomous-jobs', schedule: '11 * * * *' });
 });
 
 test('public health route does not serialize secret values', async () => {
