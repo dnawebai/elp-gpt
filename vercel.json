@@ -1,45 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    {
-      "path": "/api/cron/daily-briefing",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/daily-briefing",
-      "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/opportunity-radar",
-      "schedule": "17 */4 * * *"
-    },
-    {
-      "path": "/api/cron/relationship-intelligence",
-      "schedule": "31 */8 * * *"
-    },
-    {
-      "path": "/api/cron/notifications",
-      "schedule": "7 * * * *"
-    },
-    {
-      "path": "/api/cron/autonomous-jobs",
-      "schedule": "11 * * * *"
-    },
-    {
-      "path": "/api/cron/commitment-fulfilment",
-      "schedule": "23 */2 * * *"
-    },
-    {
-      "path": "/api/cron/anticipatory-chief-of-staff",
-      "schedule": "37 */3 * * *"
-    },
-    {
-      "path": "/api/cron/meeting-outcomes",
-      "schedule": "43 */6 * * *"
-    },
-    {
-      "path": "/api/cron/decision-learning",
-      "schedule": "53 */6 * * *"
-    }
+    { "path": "/api/cron/daily-briefing", "schedule": "0 12 * * *" },
+    { "path": "/api/cron/daily-briefing", "schedule": "0 13 * * *" },
+    { "path": "/api/cron/opportunity-radar", "schedule": "17 */4 * * *" },
+    { "path": "/api/cron/relationship-intelligence", "schedule": "31 */8 * * *" },
+    { "path": "/api/cron/notifications", "schedule": "7 * * * *" },
+    { "path": "/api/cron/autonomous-jobs", "schedule": "11 * * * *" },
+    { "path": "/api/cron/commitment-fulfilment", "schedule": "23 */2 * * *" },
+    { "path": "/api/cron/anticipatory-chief-of-staff", "schedule": "37 */3 * * *" },
+    { "path": "/api/cron/meeting-outcomes", "schedule": "43 */6 * * *" },
+    { "path": "/api/cron/decision-learning", "schedule": "53 */6 * * *" },
+    { "path": "/api/cron/portfolio-control", "schedule": "29 */4 * * *" }
   ]
 }
