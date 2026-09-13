@@ -170,14 +170,14 @@ export default function MeetingsPage() {
     finally { setBusy(null); }
   }
 
-  async function meetingAction(action: string, extra: Record<string, unknown> = {}) {
+  async function meetingAction(action: string, extra: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
     if (!selectedId) throw new Error('Select a meeting first.');
     const response = await fetch('/api/meetings', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, meetingId: selectedId, sessionId, timezone, ...extra }), cache: 'no-store',
     });
     const data = await response.json().catch(() => null) as Record<string, unknown> | null;
-    if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : `${action} failed.`);
+    if (!response.ok || !data) throw new Error(typeof data?.error === 'string' ? data.error : `${action} failed.`);
     return data;
   }
 
@@ -251,7 +251,7 @@ export default function MeetingsPage() {
         try {
           system = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
           streamsRef.current.push(system);
-          for (const track of system.getVideoTracks()) track.stop();
+          for (const track of system.getVideoTracks()) track.enabled = false;
         } catch {
           setMessage('Tab/system audio was not shared. Continuing with microphone capture only.');
         }
@@ -289,7 +289,7 @@ export default function MeetingsPage() {
           }
         } catch {}
       };
-      ws.onclose = () => { if (capturing) setMessage('Live transcription connection closed.'); };
+      ws.onclose = () => setMessage('Live transcription connection closed.');
       keepAliveRef.current = window.setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'KeepAlive' }));
       }, 8000);
