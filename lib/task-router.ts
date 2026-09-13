@@ -1,5 +1,5 @@
 import { Honcho } from '@honcho-ai/sdk';
-import { listHonchoMessages } from '@/lib/honcho-pagination';
+import { listHonchoMessages } from './honcho-pagination.ts';
 
 export type TaskQueue = 'now' | 'decisions' | 'working' | 'delegated' | 'done';
 export type TaskOwner = 'user' | 'ai' | 'connector' | 'browser' | 'human' | 'professional';
