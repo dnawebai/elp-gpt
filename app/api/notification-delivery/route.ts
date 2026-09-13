@@ -24,7 +24,15 @@ function readProfile(request: Request) {
 export async function GET(request: Request) {
   const profile = readProfile(request);
   if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
-  return NextResponse.json(await getNotificationDeliverySnapshot(profile.profileId), { headers: { 'Cache-Control': 'no-store, private' } });
+  try {
+    const snapshot = await getNotificationDeliverySnapshot(profile.profileId);
+    return NextResponse.json(snapshot, { headers: { 'Cache-Control': 'no-store, private' } });
+  } catch (error) {
+    console.error('Notification delivery snapshot failed', error);
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Notification delivery snapshot failed.',
+    }, { status: 503, headers: { 'Cache-Control': 'no-store, private' } });
+  }
 }
 
 export async function POST(request: Request) {
