@@ -52,7 +52,7 @@ export async function getCognitiveControlSnapshot(profileId: string) {
 
   const attention: AttentionItem[] = [];
   for (const risk of anticipatory.risks.filter((item) => item.severity === 'critical' || item.severity === 'high').slice(0, 8)) {
-    attention.push({ id: `forecast:${risk.id}`, source: 'anticipatory', severity: risk.severity, title: risk.title, reason: risk.summary, recommendedAction: risk.recommendedAction });
+    attention.push({ id: `forecast:${risk.id}`, source: 'anticipatory', severity: risk.severity === 'critical' ? 'critical' : 'high', title: risk.title, reason: risk.summary, recommendedAction: risk.recommendedAction });
   }
   for (const task of tasks.queues.decisions.filter((item) => item.status !== 'completed' && item.status !== 'cancelled').slice(0, 8)) {
     attention.push({ id: `task:${task.id}`, source: 'task', severity: task.priority === 'critical' ? 'critical' : task.priority === 'high' ? 'high' : 'normal', title: task.title, reason: task.summary || task.objective, recommendedAction: task.approval === 'required' ? 'Review the exact pending action and approve or reject it.' : 'Provide the missing decision or input.' });
