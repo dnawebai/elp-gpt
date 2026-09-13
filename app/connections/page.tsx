@@ -35,6 +35,8 @@ type Account = {
 };
 type Payload = {
   configured: boolean;
+  providerReady: boolean;
+  providerError: string | null;
   accounts: Account[];
   policies: Policy[];
   profileId: string;
@@ -142,7 +144,7 @@ export default function ConnectionsPage() {
 
     {notice && <p className="connections-notice">{notice}</p>}
     {error && <p className="connections-error">{error}</p>}
-    {data && !data.configured && <p className="connections-error">Composio is not configured on this deployment.</p>}
+    {data && !data.providerReady && <p className="connections-error">{data.providerError || 'Connected account provider is unavailable.'}</p>}
 
     <section className="connections-grid">
       {(data?.policies || []).map((policy) => {
@@ -168,14 +170,14 @@ export default function ConnectionsPage() {
               <span>{account.status}{account.disabled ? ' · DISABLED' : ''} · {account.source === 'profile' ? 'THIS PROFILE' : 'OWNER FALLBACK'} · {account.accountType}</span>
               {account.authScheme && <small>{account.authScheme}</small>}
             </div>
-            <button className="account-toggle" onClick={() => void toggle(account)} disabled={busy === `toggle:${account.id}`}>
+            <button className="account-toggle" onClick={() => void toggle(account)} disabled={!data?.providerReady || busy === `toggle:${account.id}`}>
               {busy === `toggle:${account.id}` ? <LoaderCircle size={15} /> : account.disabled ? <ExternalLink size={15} /> : <Unplug size={15} />}
               {account.disabled ? 'Enable' : 'Disable'}
             </button>
           </div>)}</div> : <p className="connection-empty">No account connected to this ELP profile.</p>}
 
           <div className="connection-card-actions">
-            <button className="connect-button" onClick={() => void connect(policy.slug)} disabled={!data?.configured || busy === `connect:${policy.slug}`}>
+            <button className="connect-button" onClick={() => void connect(policy.slug)} disabled={!data?.providerReady || busy === `connect:${policy.slug}`}>
               {busy === `connect:${policy.slug}` ? <LoaderCircle size={16} /> : <Link2 size={16} />}
               {active.length ? 'Connect another' : 'Connect'}
             </button>
