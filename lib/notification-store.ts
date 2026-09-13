@@ -44,7 +44,7 @@ const STATUSES = new Set<NotificationStatus>(['unread', 'read', 'dismissed', 're
 const severityRank: Record<NotificationSeverity, number> = { critical: 4, high: 3, normal: 2, low: 1 };
 
 function workspaceId() {
-  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke';
+  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt';
 }
 
 function clip(value: string, max: number) {
@@ -56,10 +56,10 @@ async function getNotificationSession(profileId: string) {
   if (!process.env.HONCHO_API_KEY) return null;
   const honcho = new Honcho({ apiKey: process.env.HONCHO_API_KEY, workspaceId: workspaceId(), environment: 'production' });
   const user = await honcho.peer(`user-${profileId}`);
-  const luke = await honcho.peer('luke');
+  const elp = await honcho.peer('elp');
   const session = await honcho.session(`notifications-${profileId}`);
-  await session.addPeers([user, luke]);
-  return { user, luke, session };
+  await session.addPeers([user, elp]);
+  return { user, elp, session };
 }
 
 function metadataString(metadata: Record<string, unknown>, key: string) {
@@ -185,7 +185,7 @@ export async function upsertNotificationCandidates(profileId: string, candidates
       continue;
     }
     await handles.session.addMessages([{
-      peerId: handles.luke.id,
+      peerId: handles.elp.id,
       content: `[NOTIFICATION] ${candidate.title}\n${candidate.summary}`,
       metadata: {
         jarbisNotification: true,

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { LUKE_SKILLS, matchSkills } from '@/lib/skills';
+import { ELP_SKILLS, matchSkills } from '@/lib/skills';
 import { PROFILE_COOKIE, verifyProfileToken } from '@/lib/security';
 
 export const runtime = 'nodejs';
@@ -20,12 +20,12 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const query = (url.searchParams.get('q') || '').trim();
-  const skills = query ? matchSkills(query, 12) : LUKE_SKILLS;
+  const skills = query ? matchSkills(query, 12) : ELP_SKILLS;
 
   return NextResponse.json(
     {
       count: skills.length,
-      total: LUKE_SKILLS.length,
+      total: ELP_SKILLS.length,
       query: query || null,
       skills,
     },

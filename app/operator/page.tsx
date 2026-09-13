@@ -76,9 +76,9 @@ export default function OperatorPage() {
   const recognitionRef = useRef<InstanceType<NonNullable<Window['webkitSpeechRecognition']>> | null>(null);
 
   useEffect(() => {
-    const existing = window.sessionStorage.getItem('luke-session-id');
+    const existing = window.sessionStorage.getItem('elp-session-id');
     const id = existing || crypto.randomUUID();
-    if (!existing) window.sessionStorage.setItem('luke-session-id', id);
+    if (!existing) window.sessionStorage.setItem('elp-session-id', id);
     setSessionId(id);
     void fetch('/api/identity', { method: 'POST', cache: 'no-store' });
   }, []);
@@ -228,7 +228,7 @@ export default function OperatorPage() {
 
   return <main className="operator-shell">
     <header className="operator-header">
-      <Link href="/" className="operator-back"><ArrowLeft size={17} /> LUKE</Link>
+      <Link href="/" className="operator-back"><ArrowLeft size={17} /> ELP</Link>
       <div><span>ELP GPT</span><h1>JARBIS Operator</h1></div>
       <Link href="/command-center" className="operator-live"><LayoutDashboard size={14} /> COMMAND CENTER</Link>
     </header>

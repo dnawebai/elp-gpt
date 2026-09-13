@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   const profileId = getOwnerProfileId();
   if (!profileId) {
     return NextResponse.json(
-      { ok: false, error: 'Autonomous relationship intelligence requires LUKE_SINGLE_USER_MODE=true.' },
+      { ok: false, error: 'Autonomous relationship intelligence requires ELP_SINGLE_USER_MODE=true.' },
       { status: 503 },
     );
   }

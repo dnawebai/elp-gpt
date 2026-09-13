@@ -71,13 +71,13 @@
     linear-gradient(180deg, rgba(0, 5, 8, .08), transparent 28%, transparent 70%, rgba(0, 3, 6, .34));
 }
 
-.luke-shell {
+.elp-shell {
   z-index: 1;
   background: transparent !important;
 }
 
-.luke-shell::before,
-.luke-shell::after,
+.elp-shell::before,
+.elp-shell::after,
 .ambient {
   opacity: .26;
 }

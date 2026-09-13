@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runLuke, type ChatMessage } from '@/lib/luke';
+import { runElp, type ChatMessage } from '@/lib/elp';
 import { persistTranscript } from '@/lib/memory';
 import { PROFILE_COOKIE, sanitizeId, verifyProfileToken } from '@/lib/security';
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const lastUser = messages[messages.length - 1]!;
     await persistTranscript(profile.profileId, sessionId, 'user', lastUser.content);
 
-    const result = await runLuke({ messages, profileId: profile.profileId, sessionId });
+    const result = await runElp({ messages, profileId: profile.profileId, sessionId });
     await persistTranscript(profile.profileId, sessionId, 'assistant', result.text);
 
     return NextResponse.json(
@@ -57,9 +57,9 @@ export async function POST(request: Request) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
-    console.error('LUKE chat error', error);
+    console.error('ELP chat error', error);
     return NextResponse.json(
-      { error: 'LUKE is temporarily unavailable. Verify the configured model provider.' },
+      { error: 'ELP is temporarily unavailable. Verify the configured model provider.' },
       { status: 502 },
     );
   }

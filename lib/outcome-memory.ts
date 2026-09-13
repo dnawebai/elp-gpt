@@ -40,7 +40,7 @@ export type MeetingOutcomeSnapshot = {
 const STATUSES = new Set<MeetingOutcomeStatus>(['pending', 'achieved', 'partial', 'missed', 'abandoned']);
 
 function workspaceId() {
-  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke';
+  return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt';
 }
 
 function clip(value: string, max: number) {
@@ -81,10 +81,10 @@ async function getOutcomeSession(profileId: string) {
     environment: 'production',
   });
   const user = await honcho.peer(`user-${profileId}`);
-  const luke = await honcho.peer('luke');
+  const elp = await honcho.peer('elp');
   const session = await honcho.session(`meeting-outcomes-${profileId}`);
-  await session.addPeers([user, luke]);
-  return { user, luke, session };
+  await session.addPeers([user, elp]);
+  return { user, elp, session };
 }
 
 function parseOutcome(message: { id: string; content: string; createdAt: string; metadata: Record<string, unknown> }): MeetingOutcomeRecord | null {
@@ -144,7 +144,7 @@ export async function createMeetingOutcome(profileId: string, input: {
   const objective = clip(input.objective || `Verify the intended result of ${input.title}.`, 2400);
   const evidence = (input.initialEvidence || []).filter(Boolean).map((item) => clip(item, 900)).slice(0, 12);
   const created = await handles.session.addMessages([{
-    peerId: handles.luke.id,
+    peerId: handles.elp.id,
     content: `[MEETING_OUTCOME] ${now}\n${clip(input.title, 180)}\n${objective}`,
     metadata: {
       jarbisMeetingOutcome: true,

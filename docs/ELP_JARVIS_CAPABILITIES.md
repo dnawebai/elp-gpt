@@ -1,10 +1,10 @@
-# LUKE / ELP GPT — Practical JARVIS Capability Layer
+# ELP GPT — Practical JARVIS Capability Layer
 
-This document defines the production architecture for evolving LUKE from a voice assistant into a permissioned personal-agent system.
+This document defines the production architecture for evolving ELP from a voice assistant into a permissioned personal-agent system.
 
 ## Operating principle
 
-LUKE is one user-facing assistant backed by modular capabilities. The execution preference is:
+ELP is one user-facing assistant backed by modular capabilities. The execution preference is:
 
 1. Authenticated API / connector
 2. Structured MCP or provider tool
@@ -23,7 +23,7 @@ The repository already contains:
 - Hermes-first / Together fallback reasoning
 - Honcho long-term user context and transcript persistence
 - Composio tool discovery and execution
-- Signed LUKE profile and voice gateway identities
+- Signed ELP profile and voice gateway identities
 - Cryptographically bound action proposals and approvals
 - Read / write / high-risk action classification
 - PWA install experience
@@ -67,7 +67,7 @@ The app currently uses server-side Composio REST endpoints for tool discovery an
 Recommended production allowlist:
 
 ```text
-LUKE_ALLOWED_TOOLKITS=GMAIL,GOOGLECALENDAR,GOOGLEDRIVE,COMPOSIO_SEARCH,YELP,RETELLAI,GITHUB
+ELP_ALLOWED_TOOLKITS=GMAIL,GOOGLECALENDAR,GOOGLEDRIVE,COMPOSIO_SEARCH,YELP,RETELLAI,GITHUB
 ```
 
 Only enable a toolkit after its OAuth/provider connection is configured and its requested scopes have been reviewed.
@@ -87,14 +87,14 @@ Vapi can be added as an alternate telephony provider later. Avoid enabling two p
 
 ## Phone-agent architecture
 
-Deepgram remains LUKE's realtime user-facing voice interface. Outbound business calls are a separate capability.
+Deepgram remains ELP's realtime user-facing voice interface. Outbound business calls are a separate capability.
 
 Recommended flow:
 
 ```text
-User -> LUKE -> local/business research -> exact phone target
+User -> ELP -> local/business research -> exact phone target
      -> approval -> Retell/Vapi outbound call
-     -> call status/transcript/result -> LUKE verification -> user
+     -> call status/transcript/result -> ELP verification -> user
 ```
 
 A production phone integration needs:
@@ -111,7 +111,7 @@ Do not allow arbitrary high-volume dialing from the general-purpose assistant.
 
 ## Memory and learning
 
-Honcho remains the long-term user-model layer. LUKE should improve through controlled memory and evaluation, not uncontrolled self-modification.
+Honcho remains the long-term user-model layer. ELP should improve through controlled memory and evaluation, not uncontrolled self-modification.
 
 Store or infer only information needed to improve future service, with a distinction between:
 
@@ -141,7 +141,7 @@ The existing signed action-token design binds approval to the exact tool and exa
 
 ## External projects reviewed for architectural patterns
 
-The following mature/open-source projects are useful references, but should not be copied wholesale into LUKE:
+The following mature/open-source projects are useful references, but should not be copied wholesale into ELP:
 
 - `ComposioHQ/composio` — authenticated app/tool integration patterns
 - `browser-use/browser-use` — browser-agent patterns
@@ -150,15 +150,15 @@ The following mature/open-source projects are useful references, but should not 
 - `langchain-ai/langgraph` — durable agent graph/orchestration patterns
 - `openai/openai-agents-python` — agent, handoff, guardrail, and tracing patterns
 
-Production rule: borrow a component only when it closes a concrete capability gap and passes dependency/security review. Do not make LUKE depend on every agent framework simultaneously.
+Production rule: borrow a component only when it closes a concrete capability gap and passes dependency/security review. Do not make ELP depend on every agent framework simultaneously.
 
 ## Next implementation sequence
 
-1. Configure production secrets and a dedicated `LUKE_SESSION_SECRET`.
+1. Configure production secrets and a dedicated `ELP_SESSION_SECRET`.
 2. Connect Gmail, Calendar, Drive, local search, and Retell/Vapi in the deployment's Composio project.
 3. Validate every enabled toolkit through read-only smoke tests.
 4. Validate write actions through the existing proposal/approval/execute flow.
-5. Add connected-account management UX so every LUKE user can authorize their own services.
+5. Add connected-account management UX so every ELP user can authorize their own services.
 6. Add persistent jobs/webhooks for monitoring and proactive briefings.
 7. Add phone-call objective templates and outcome extraction.
 8. Add browser/computer-use fallback only after the direct API layer is stable.

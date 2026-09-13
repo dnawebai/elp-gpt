@@ -19,16 +19,16 @@ async function getHonchoSession(profileId: string, sessionId: string) {
 
   const honcho = new Honcho({
     apiKey: process.env.HONCHO_API_KEY,
-    workspaceId: process.env.HONCHO_WORKSPACE_ID || 'elp-gpt-luke',
+    workspaceId: process.env.HONCHO_WORKSPACE_ID || 'elp-gpt',
     environment: 'production',
   });
 
   const user = await honcho.peer(`user-${profileId}`);
-  const luke = await honcho.peer('luke');
+  const elp = await honcho.peer('elp');
   const session = await honcho.session(`session-${profileId}-${sessionId}`);
-  await session.addPeers([user, luke]);
+  await session.addPeers([user, elp]);
 
-  return { user, luke, session };
+  return { user, elp, session };
 }
 
 export async function getMemorySnapshot(profileId: string, sessionId: string): Promise<MemorySnapshot> {
@@ -83,7 +83,7 @@ export async function persistTranscript(
   try {
     const handles = await getHonchoSession(profileId, sessionId);
     if (!handles) return false;
-    const peer = role === 'user' ? handles.user : handles.luke;
+    const peer = role === 'user' ? handles.user : handles.elp;
     await handles.session.addMessages([peer.message(content)]);
 
     if (role === 'user') {

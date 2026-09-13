@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "LUKE — ELP GPT",
-  "short_name": "LUKE",
+  "name": "ELP GPT",
+  "short_name": "ELP",
   "description": "Voice-first intelligence system",
   "start_url": "/",
   "scope": "/",

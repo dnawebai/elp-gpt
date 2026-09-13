@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getApprovalLedger } from '@/lib/approval-ledger';
 import { isComposioConfigured } from '@/lib/composio';
-import { getReasoningProviders } from '@/lib/luke';
+import { getReasoningProviders } from '@/lib/elp';
 import { getNotificationCenter } from '@/lib/notifications';
 import { getRadarSnapshot } from '@/lib/radar';
 import { getRelationshipSnapshot } from '@/lib/relationship-memory';

@@ -33,7 +33,7 @@ type TaskBoard = {
 const QUEUES: Array<{ key: TaskQueue; label: string; description: string }> = [
   { key: 'now', label: 'NOW', description: 'Your immediate attention' },
   { key: 'decisions', label: 'DECISIONS', description: 'Approval or input required' },
-  { key: 'working', label: 'ELP WORKING', description: 'LUKE/JARBIS executing' },
+  { key: 'working', label: 'ELP WORKING', description: 'ELP/JARBIS executing' },
   { key: 'delegated', label: 'DELEGATED', description: 'Human or third party' },
   { key: 'done', label: 'DONE', description: 'Verified completion' },
 ];

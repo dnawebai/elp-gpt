@@ -174,7 +174,7 @@ export default function ExecutiveLedgerPage() {
 
   return <main style={{minHeight:'100vh',background:'#06111f',color:'#eaf4ff',padding:'26px',fontFamily:'Inter,Arial,sans-serif'}}>
     <header style={{maxWidth:1280,margin:'0 auto 24px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:18}}>
-      <Link href="/" style={{color:'#9dc9ff',textDecoration:'none',display:'flex',gap:8,alignItems:'center'}}><ArrowLeft size={17}/> LUKE</Link>
+      <Link href="/" style={{color:'#9dc9ff',textDecoration:'none',display:'flex',gap:8,alignItems:'center'}}><ArrowLeft size={17}/> ELP</Link>
       <div style={{textAlign:'center'}}><div style={{fontSize:11,letterSpacing:2.4,color:'#6e9bc7'}}>JARBIS EXECUTIVE CONTROL</div><h1 style={{margin:'4px 0'}}>Commitment Graph + Decision Ledger</h1></div>
       <button onClick={()=>void load()} disabled={loading} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderRadius:10,border:'1px solid #294866',background:'#0a1b2b',color:'#cfe8ff',cursor:'pointer'}}><RefreshCw size={15}/> Refresh</button>
     </header>

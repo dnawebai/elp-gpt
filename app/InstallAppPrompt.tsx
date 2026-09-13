@@ -100,9 +100,9 @@ export default function InstallAppPrompt() {
         </div>
 
         <div className="install-copy">
-          <span className="install-eyebrow">ELP GPT · LUKE</span>
+          <span className="install-eyebrow">ELP GPT</span>
           <h2 id="install-title">Install ELP GPT</h2>
-          <p>Add LUKE to your phone, tablet, or desktop for faster access, full-screen use, and one-tap voice.</p>
+          <p>Add ELP to your phone, tablet, or desktop for faster access, full-screen use, and one-tap voice.</p>
         </div>
 
         {(showSteps || isiOS) && (

@@ -1,4 +1,4 @@
-import { buildLukeSystemPrompt, getReasoningProviders } from '@/lib/luke';
+import { buildElpSystemPrompt, getReasoningProviders } from '@/lib/elp';
 import { bearerToken, verifyVoiceGatewayToken } from '@/lib/security';
 
 export const runtime = 'nodejs';
@@ -18,7 +18,7 @@ type OpenAIRequest = {
 export async function POST(request: Request) {
   const claims = verifyVoiceGatewayToken(bearerToken(request.headers.get('authorization')));
   if (!claims) {
-    return Response.json({ error: { message: 'Invalid or expired LUKE voice session.' } }, { status: 401 });
+    return Response.json({ error: { message: 'Invalid or expired ELP voice session.' } }, { status: 401 });
   }
 
   const contentLength = Number(request.headers.get('content-length') || '0');
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   const providers = getReasoningProviders();
   if (!providers.length) {
-    return Response.json({ error: { message: 'LUKE reasoning provider is not configured.' } }, { status: 503 });
+    return Response.json({ error: { message: 'ELP reasoning provider is not configured.' } }, { status: 503 });
   }
 
   const body = (await request.json().catch(() => null)) as OpenAIRequest | null;
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     .filter((message) => message.role !== 'system')
     .slice(-48);
 
-  const system = await buildLukeSystemPrompt(claims.profileId, claims.sessionId);
+  const system = await buildElpSystemPrompt(claims.profileId, claims.sessionId);
   const maxTokens = Math.max(64, Math.min(Number(body.max_tokens) || 900, 1600));
   const stream = body.stream !== false;
 
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       if (!upstream.ok) {
         const detail = await upstream.text().catch(() => '');
         failures.push(`${provider.name}:${upstream.status}`);
-        console.error('LUKE voice gateway upstream error', provider.name, upstream.status, detail.slice(0, 300));
+        console.error('ELP voice gateway upstream error', provider.name, upstream.status, detail.slice(0, 300));
         continue;
       }
 
@@ -88,19 +88,19 @@ export async function POST(request: Request) {
         headers: {
           'Content-Type': upstream.headers.get('content-type') || (stream ? 'text/event-stream' : 'application/json'),
           'Cache-Control': 'no-store',
-          'X-Luke-Provider': provider.name,
+          'X-Elp-Provider': provider.name,
         },
       });
     } catch (error) {
       const reason = error instanceof Error ? error.name : 'error';
       failures.push(`${provider.name}:${reason}`);
-      console.error('LUKE voice gateway provider failure', provider.name, error);
+      console.error('ELP voice gateway provider failure', provider.name, error);
     }
   }
 
-  console.error('LUKE voice gateway exhausted providers', failures.join(', '));
+  console.error('ELP voice gateway exhausted providers', failures.join(', '));
   return Response.json(
-    { error: { message: 'LUKE reasoning providers are temporarily unavailable.', type: 'upstream_error' } },
+    { error: { message: 'ELP reasoning providers are temporarily unavailable.', type: 'upstream_error' } },
     { status: 502 },
   );
 }

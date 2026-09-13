@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getComposioIdentityHealth, isComposioConfigured } from '@/lib/composio';
 import { getDeepgramRuntimeConfig, isDeepgramConfigured, verifyDeepgramConnection } from '@/lib/deepgram';
-import { getReasoningProvider } from '@/lib/luke';
+import { getReasoningProvider } from '@/lib/elp';
 import { getSecurityMode } from '@/lib/security';
-import { LUKE_SKILLS } from '@/lib/skills';
+import { ELP_SKILLS } from '@/lib/skills';
 
 export const runtime = 'nodejs';
 
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     listenModel: config.listenModel,
     voiceVersion: config.speakVersion,
     listenVersion: config.listenVersion,
-    skills: LUKE_SKILLS.length,
+    skills: ELP_SKILLS.length,
     deviceContext: true,
     preciseLocation: 'permission-required',
     outboundCalling: retellConfigured ? 'retell-web-ready' : 'deferred',

@@ -28,9 +28,9 @@ export default function FollowUpsPage() {
   const [error,setError]=useState<string|null>(null);
 
   useEffect(()=>{
-    const existing=window.sessionStorage.getItem('luke-session-id');
+    const existing=window.sessionStorage.getItem('elp-session-id');
     const id=existing||crypto.randomUUID();
-    if(!existing) window.sessionStorage.setItem('luke-session-id',id);
+    if(!existing) window.sessionStorage.setItem('elp-session-id',id);
     setSessionId(id);
     void fetch('/api/identity',{method:'POST',cache:'no-store'}).then(()=>load()).catch(()=>load());
   },[]);
@@ -110,7 +110,7 @@ export default function FollowUpsPage() {
   const chip={border:'1px solid #2b4b69',borderRadius:999,padding:'9px 13px',background:'#0a1725',color:'#cfe7fb',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7} as const;
   return <main style={{minHeight:'100vh',background:'#06111f',color:'#eaf4ff',padding:26,fontFamily:'Inter,Arial,sans-serif'}}>
     <header style={{maxWidth:1280,margin:'0 auto 22px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:16,flexWrap:'wrap'}}>
-      <Link href="/" style={{display:'flex',alignItems:'center',gap:8,color:'#9dc9ff',textDecoration:'none'}}><ArrowLeft size={17}/> LUKE</Link>
+      <Link href="/" style={{display:'flex',alignItems:'center',gap:8,color:'#9dc9ff',textDecoration:'none'}}><ArrowLeft size={17}/> ELP</Link>
       <div style={{textAlign:'center'}}><div style={{fontSize:11,letterSpacing:2,color:'#6e9bc7'}}>JARBIS</div><h1 style={{margin:'4px 0'}}>Follow-Up Executor + Outcome Learning</h1><div style={{fontSize:12,color:'#77e0b5'}}>APPROVAL-GATED EXECUTION · VERIFIED OUTCOMES · LEARNING LOOP</div></div>
       <button onClick={()=>void load()} style={chip}><RefreshCw size={15}/> Refresh</button>
     </header>

@@ -49,32 +49,32 @@ function normalizeHttpBase(value: string | undefined) {
 }
 
 export function getDeepgramRuntimeConfig(): DeepgramRuntimeConfig {
-  const listenModel = process.env.LUKE_LISTEN_MODEL || 'flux-general-multi';
-  const voiceModel = process.env.LUKE_VOICE_MODEL || 'flux-cliff-en';
+  const listenModel = process.env.ELP_LISTEN_MODEL || 'flux-general-multi';
+  const voiceModel = process.env.ELP_VOICE_MODEL || 'flux-cliff-en';
   const isFluxVoice = voiceModel.startsWith('flux-');
-  const requestedSpeed = boundedNumber(process.env.LUKE_VOICE_SPEED, 1, 0.7, 1.5);
+  const requestedSpeed = boundedNumber(process.env.ELP_VOICE_SPEED, 1, 0.7, 1.5);
 
   return {
     apiBaseUrl: normalizeHttpBase(process.env.DEEPGRAM_API_URL),
     agentUrl: process.env.DEEPGRAM_AGENT_URL?.trim() || null,
     listenModel,
     listenVersion: listenModel.startsWith('flux-') ? 'v2' : 'v1',
-    languageHints: csv(process.env.LUKE_LISTEN_LANGUAGE_HINTS, ['en', 'pt']),
-    keyterms: csv(process.env.LUKE_LISTEN_KEYTERMS, [
-      'LUKE',
+    languageHints: csv(process.env.ELP_LISTEN_LANGUAGE_HINTS, ['en', 'pt']),
+    keyterms: csv(process.env.ELP_LISTEN_KEYTERMS, [
+      'ELP',
       'ELP GPT',
       'Deepgram',
       'Hermes',
       'Honcho',
       'Together AI',
     ]),
-    eotThreshold: boundedNumber(process.env.LUKE_EOT_THRESHOLD, 0.78, 0.5, 0.9),
-    eagerEotThreshold: boundedNumber(process.env.LUKE_EAGER_EOT_THRESHOLD, 0.5, 0.3, 0.9),
-    eotTimeoutMs: Math.round(boundedNumber(process.env.LUKE_EOT_TIMEOUT_MS, 2600, 500, 10000)),
+    eotThreshold: boundedNumber(process.env.ELP_EOT_THRESHOLD, 0.78, 0.5, 0.9),
+    eagerEotThreshold: boundedNumber(process.env.ELP_EAGER_EOT_THRESHOLD, 0.5, 0.3, 0.9),
+    eotTimeoutMs: Math.round(boundedNumber(process.env.ELP_EOT_TIMEOUT_MS, 2600, 500, 10000)),
     voiceModel,
     speakVersion: isFluxVoice ? 'v2' : 'v1',
     voiceSpeed: isFluxVoice ? nearestFluxSpeed(requestedSpeed) : requestedSpeed,
-    managedThinkModel: process.env.LUKE_DEEPGRAM_MANAGED_LLM_MODEL || 'gpt-5-mini',
+    managedThinkModel: process.env.ELP_DEEPGRAM_MANAGED_LLM_MODEL || 'gpt-5-mini',
   };
 }
 

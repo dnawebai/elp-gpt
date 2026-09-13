@@ -1,6 +1,6 @@
 import { executiveMemoryToPrompt, getExecutiveMemorySnapshot } from '@/lib/executive-memory';
 import { getMemorySnapshot, memoryToPrompt, persistTranscript } from '@/lib/memory';
-import { getReasoningProviders, type ReasoningProvider } from '@/lib/luke';
+import { getReasoningProviders, type ReasoningProvider } from '@/lib/elp';
 
 export type ShadowBoardRoleId = 'strategy' | 'finance' | 'technology' | 'legal-risk' | 'operations' | 'red-team';
 

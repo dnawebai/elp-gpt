@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   if (!isAuthorised(request)) return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
   const profileId = getOwnerProfileId();
   if (!profileId) {
-    return NextResponse.json({ ok: false, error: 'Autonomous notifications require LUKE_SINGLE_USER_MODE=true.' }, { status: 503 });
+    return NextResponse.json({ ok: false, error: 'Autonomous notifications require ELP_SINGLE_USER_MODE=true.' }, { status: 503 });
   }
   try {
     const result = await refreshNotifications(profileId);

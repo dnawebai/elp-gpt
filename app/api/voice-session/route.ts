@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDeepgramRuntimeConfig, isDeepgramConfigured } from '@/lib/deepgram';
-import { getReasoningProvider } from '@/lib/luke';
+import { getReasoningProvider } from '@/lib/elp';
 import {
   createVoiceGatewayToken,
   PROFILE_COOKIE,
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   if (provider) {
     response.token = createVoiceGatewayToken(profile.profileId, sessionId);
     response.thinkEndpoint = `${origin}/api/voice/think`;
-    response.model = 'luke-router';
+    response.model = 'elp-router';
   } else {
     response.model = config.managedThinkModel;
   }

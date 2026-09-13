@@ -10,14 +10,14 @@ import InstallAppPrompt from './InstallAppPrompt';
 import RetellCallDock from './RetellCallDock';
 
 const SITE_URL = 'https://elpgpt.com';
-const TITLE = 'ELP GPT — LUKE AI Voice Assistant & Operator';
-const DESCRIPTION = 'ELP GPT is the home of LUKE, a voice-first AI advisor and operator that can reason, remember context, work across connected tools, and execute permission-gated actions.';
+const TITLE = 'ELP GPT — AI Voice Assistant & Operator';
+const DESCRIPTION = 'ELP GPT is a voice-first AI advisor and operator that can reason, remember context, work across connected tools, and execute permission-gated actions.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
-  applicationName: 'LUKE by ELP GPT',
+  applicationName: 'ELP GPT',
   alternates: { canonical: '/' },
   robots: {
     index: true,
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'LUKE',
+    title: 'ELP',
   },
 };
 
@@ -61,8 +61,8 @@ const webAppSchema = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
   '@id': `${SITE_URL}/#app`,
-  name: 'LUKE by ELP GPT',
-  alternateName: ['ELP GPT', 'LUKE AI'],
+  name: 'ELP GPT',
+  alternateName: ['ELP GPT', 'ELP AI'],
   url: SITE_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',

@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentMicrophone, AgentPlayer, AgentSession } from '@deepgram/agents';
-import type { LukeDeviceContext } from '@/lib/device-context';
+import type { ElpDeviceContext } from '@/lib/device-context';
 
 type VoiceMessage = { role: 'user' | 'assistant'; content: string };
-export type LukeVoiceCommand = { name: string; input: Record<string, unknown> };
+export type ElpVoiceCommand = { name: string; input: Record<string, unknown> };
 
 type Options = {
   enabled: boolean;
   sessionId: string;
   onMessage: (message: VoiceMessage) => void;
-  onCommand?: (command: LukeVoiceCommand) => Promise<unknown> | unknown;
+  onCommand?: (command: ElpVoiceCommand) => Promise<unknown> | unknown;
   onError?: (message: string) => void;
 };
 
@@ -41,7 +41,7 @@ type OperatorPendingVoiceAction = {
   risk: 'write' | 'high';
 };
 
-const VOICE_PROMPT = `You are LUKE, the voice-first intelligence system for ELP GPT.
+const VOICE_PROMPT = `You are ELP, the voice-first intelligence system for ELP GPT.
 
 Relationship and voice manner:
 - Address the primary user as "Sir" by default.
@@ -56,7 +56,7 @@ Relationship and voice manner:
 Speak naturally, calmly, precisely, and concisely. Voice is the primary interface.
 Use profile navigation tools when the user asks to see memory, skills, signals, briefings, permissions, system status, or their profile.
 Use get_system_status when asked whether services are online.
-Use find_skills when you need to identify LUKE's supported capability for an unfamiliar or multi-step request.
+Use find_skills when you need to identify ELP's supported capability for an unfamiliar or multi-step request.
 Use get_device_context for local-time, timezone, locale, or connectivity context. For "near me", "close to me", or other location-dependent requests, call get_device_context with include_location=true before searching. Precise location requires the user's browser permission and must never be guessed.
 Use jarbis_command for JARBIS-native executive intelligence: running an Operator mission, asking what needs attention, requesting a daily brief or meeting prep, reading Opportunity Radar, reviewing relationships, preparing a negotiation, checking the Executive Ledger/commitments, or reading the Command Center. Prefer jarbis_command over manually recreating those capabilities with generic tools.
 For a negotiation request, pass the counterpart in target and the desired outcome in objective when known. Never invent negotiation facts or counterpart motives.
@@ -65,17 +65,17 @@ Prefer authenticated APIs and connectors over visual browser automation. Use bro
 Read-only actions can run immediately when directly requested. Any write or consequential action must be prepared first and requires explicit user approval. Ask for approval plainly, then call approve_action only after the user clearly approves. If the user declines, call reject_action.
 When a JARBIS mission returns approval_required, describe exactly what is waiting and ask for approval. Do not call approve_action until the user explicitly says yes/approve/proceed.
 Never claim an external action happened unless the tool result confirms it. Never reinterpret approval for a different tool or changed arguments.
-Do not imitate fictional dialogue. LUKE is an original ELP GPT system.`;
+Do not imitate fictional dialogue. ELP is an original ELP GPT system.`;
 
 const UI_FUNCTIONS = [
   {
     name: 'open_profile',
-    description: 'Open the LUKE profile and system drawer when the user asks to see their profile, controls, settings, or tools.',
+    description: 'Open the ELP profile and system drawer when the user asks to see their profile, controls, settings, or tools.',
     parameters: { type: 'object', properties: {} },
   },
   {
     name: 'open_profile_section',
-    description: 'Open a specific hidden LUKE profile section.',
+    description: 'Open a specific hidden ELP profile section.',
     parameters: {
       type: 'object',
       properties: {
@@ -86,12 +86,12 @@ const UI_FUNCTIONS = [
   },
   {
     name: 'close_profile',
-    description: 'Close the profile and return to the main LUKE voice HUD.',
+    description: 'Close the profile and return to the main ELP voice HUD.',
     parameters: { type: 'object', properties: {} },
   },
   {
     name: 'get_system_status',
-    description: 'Check which LUKE engines are configured and available before answering a system-status question.',
+    description: 'Check which ELP engines are configured and available before answering a system-status question.',
     parameters: { type: 'object', properties: {} },
   },
   {
@@ -109,7 +109,7 @@ const UI_FUNCTIONS = [
   },
   {
     name: 'find_skills',
-    description: 'Search LUKE\'s first-party skill registry to identify the best capability for a request.',
+    description: 'Search ELP\'s first-party skill registry to identify the best capability for a request.',
     parameters: {
       type: 'object',
       properties: {
@@ -175,7 +175,7 @@ const UI_FUNCTIONS = [
   },
 ] as const;
 
-function readBasicDeviceContext(): LukeDeviceContext {
+function readBasicDeviceContext(): ElpDeviceContext {
   let timezone: string | undefined;
   try {
     timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
@@ -192,7 +192,7 @@ function readBasicDeviceContext(): LukeDeviceContext {
   };
 }
 
-async function captureDeviceContext(includeLocation: boolean): Promise<LukeDeviceContext> {
+async function captureDeviceContext(includeLocation: boolean): Promise<ElpDeviceContext> {
   const context = readBasicDeviceContext();
   if (!includeLocation || !navigator.geolocation) return context;
 
@@ -221,7 +221,7 @@ async function captureDeviceContext(includeLocation: boolean): Promise<LukeDevic
   });
 }
 
-export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError }: Options) {
+export function useElpVoice({ enabled, sessionId, onMessage, onCommand, onError }: Options) {
   const sessionRef = useRef<AgentSession | null>(null);
   const micRef = useRef<AgentMicrophone | null>(null);
   const playerRef = useRef<AgentPlayer | null>(null);
@@ -274,14 +274,14 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
     setState('connecting');
     try {
       const identity = await fetch('/api/identity', { method: 'POST', cache: 'no-store' });
-      if (!identity.ok) throw new Error('Unable to establish LUKE identity.');
+      if (!identity.ok) throw new Error('Unable to establish ELP identity.');
       const configResponse = await fetch('/api/voice-session', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }), cache: 'no-store',
       });
       if (!configResponse.ok) {
         const detail = (await configResponse.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(detail?.error || 'LUKE voice session is not configured.');
+        throw new Error(detail?.error || 'ELP voice session is not configured.');
       }
       const voiceConfig = (await configResponse.json()) as VoiceSessionConfig;
       const player = new AgentPlayer({ sampleRate: 24_000 });
@@ -300,14 +300,14 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
         prompt: VOICE_PROMPT, functions: UI_FUNCTIONS,
       };
       if (voiceConfig.reasoningMode === 'external') {
-        if (!voiceConfig.token || !voiceConfig.thinkEndpoint) throw new Error('LUKE external reasoning session is incomplete.');
+        if (!voiceConfig.token || !voiceConfig.thinkEndpoint) throw new Error('ELP external reasoning session is incomplete.');
         think.endpoint = { url: voiceConfig.thinkEndpoint, headers: { authorization: `Bearer ${voiceConfig.token}` } };
         think.context_length = 'max';
       }
       const agentConfig = {
         listen: { provider: listenProvider }, think,
         speak: { provider: { type: 'deepgram', version: voiceConfig.speakVersion, model: voiceConfig.voiceModel, speed: voiceConfig.voiceSpeed } },
-        greeting: 'Good day, Sir. LUKE is online.',
+        greeting: 'Good day, Sir. ELP is online.',
       } as any;
       const session = new AgentSession({
         auth: { tokenFactory: async () => {
@@ -378,13 +378,13 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
         }
       });
       session.on('sdk-error', (error) => { console.error('Deepgram voice SDK error', error); setState('error'); onError?.('Realtime voice encountered a Deepgram connection error.'); });
-      session.on('error', (error) => { console.error('Deepgram voice agent error', error); setState('error'); onError?.('The LUKE voice system returned an error.'); });
+      session.on('error', (error) => { console.error('Deepgram voice agent error', error); setState('error'); onError?.('The ELP voice system returned an error.'); });
       session.on('disconnected', () => { if (sessionRef.current) setState('idle'); });
       const microphone = new AgentMicrophone((data) => session.sendAudio(data), { sampleRate: 16_000, echoCancellation: true, noiseSuppression: true, autoGainControl: true });
       playerRef.current = player; sessionRef.current = session; micRef.current = microphone;
       await session.connect(); await microphone.start(); setState('listening');
     } catch (error) {
-      console.error('Unable to start LUKE voice', error); stop(); setState('error');
+      console.error('Unable to start ELP voice', error); stop(); setState('error');
       onError?.(error instanceof Error ? error.message : 'Voice could not start.');
     }
   }, [enabled, onCommand, onError, onMessage, persistMessage, runJarbisVoiceCommand, sessionId, stop]);

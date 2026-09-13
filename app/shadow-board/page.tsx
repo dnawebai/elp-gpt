@@ -30,9 +30,9 @@ export default function ShadowBoardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const existing = window.sessionStorage.getItem('luke-session-id');
+    const existing = window.sessionStorage.getItem('elp-session-id');
     const id = existing || crypto.randomUUID();
-    if (!existing) window.sessionStorage.setItem('luke-session-id', id);
+    if (!existing) window.sessionStorage.setItem('elp-session-id', id);
     setSessionId(id);
     void fetch('/api/identity', { method: 'POST', cache: 'no-store' });
   }, []);
@@ -62,7 +62,7 @@ export default function ShadowBoardPage() {
 
   return <main style={{minHeight:'100vh',background:'#06111f',color:'#eaf4ff',padding:'28px',fontFamily:'Inter,Arial,sans-serif'}}>
     <header style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:20,maxWidth:1180,margin:'0 auto 28px'}}>
-      <Link href="/" style={{color:'#9dc9ff',textDecoration:'none',display:'flex',alignItems:'center',gap:8}}><ArrowLeft size={17}/> LUKE</Link>
+      <Link href="/" style={{color:'#9dc9ff',textDecoration:'none',display:'flex',alignItems:'center',gap:8}}><ArrowLeft size={17}/> ELP</Link>
       <div style={{textAlign:'center'}}><div style={{fontSize:12,letterSpacing:2,color:'#6e9bc7'}}>ELP GPT</div><h1 style={{margin:'4px 0'}}>JARBIS Shadow Board</h1></div>
       <div style={{fontSize:12,color:'#77e0b5'}}>ADVISORY ONLY</div>
     </header>
