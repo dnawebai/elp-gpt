@@ -1,4 +1,5 @@
 import { cognitivePolicyToPrompt, getCognitivePolicySnapshot } from '@/lib/cognitive-policy';
+import { dailyOperatingPlanToPrompt, getLatestDailyOperatingPlan } from '@/lib/daily-plan-memory';
 import { EXECUTIVE_DOCTRINE } from '@/lib/executive-doctrine';
 import {
   executiveLedgerToPrompt,
@@ -113,7 +114,7 @@ export function getReasoningProvider(): ReasoningProvider | null {
 }
 
 export async function buildElpSystemPrompt(profileId: string, sessionId: string) {
-  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes, cognitivePolicy, calibration, portfolio] = await Promise.all([
+  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes, cognitivePolicy, calibration, portfolio, dailyPlan] = await Promise.all([
     getMemorySnapshot(profileId, sessionId),
     getExecutiveMemorySnapshot(profileId),
     getExecutiveLedger(profileId),
@@ -124,6 +125,7 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
     getCognitivePolicySnapshot(profileId),
     getStoredStrategyCalibration(profileId),
     getPortfolioSnapshot(profileId),
+    getLatestDailyOperatingPlan(profileId),
   ]);
   const memoryText = memoryToPrompt(memory);
   const executiveText = executiveMemoryToPrompt(executiveMemory);
@@ -135,12 +137,14 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
   const cognitiveText = cognitivePolicyToPrompt(cognitivePolicy);
   const calibrationText = strategyCalibrationToPrompt(calibration);
   const portfolioText = portfolioSnapshotToPrompt(portfolio);
+  const dailyPlanText = dailyOperatingPlanToPrompt(dailyPlan);
   const sections = [
     ELP_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
     cognitiveText ? `COGNITIVE POLICY:\n${cognitiveText}` : '',
     calibrationText ? `DECISION CALIBRATION:\n${calibrationText}` : '',
     portfolioText ? `PORTFOLIO CONTROL:\n${portfolioText}` : '',
+    dailyPlanText ? `DAILY OPERATING PLAN:\n${dailyPlanText}` : '',
     lifeOperatorPrompt(),
     `AVAILABLE ELP SKILLS:\n${skillsToPrompt()}`,
     notificationText ? `PRIORITY NOTIFICATIONS:\n${notificationText}` : '',
