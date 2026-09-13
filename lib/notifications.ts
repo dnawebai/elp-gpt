@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { getAnticipatorySnapshot } from '@/lib/anticipatory-chief-of-staff';
 import { getApprovalLedger } from '@/lib/approval-ledger';
 import {
   getNotificationCenter,
@@ -37,11 +38,12 @@ function withinHours(value: string | undefined, hours: number) {
 }
 
 async function collectCandidates(profileId: string): Promise<NotificationCandidate[]> {
-  const [tasks, approvals, radar, relationships] = await Promise.all([
+  const [tasks, approvals, radar, relationships, anticipatory] = await Promise.all([
     getTaskBoard(profileId),
     getApprovalLedger(profileId),
     getRadarSnapshot(profileId),
     getRelationshipSnapshot(profileId),
+    getAnticipatorySnapshot(profileId),
   ]);
   const result: NotificationCandidate[] = [];
 
@@ -125,6 +127,24 @@ async function collectCandidates(profileId: string): Promise<NotificationCandida
     });
   }
 
+  for (const forecast of anticipatory.risks) {
+    if (forecast.severity === 'medium') continue;
+    const kind: NotificationKind = forecast.type === 'deadline_failure'
+      ? 'deadline'
+      : forecast.type === 'relationship_followup'
+        ? 'relationship'
+        : 'risk';
+    addCandidate(result, {
+      kind,
+      severity: forecast.severity === 'critical' ? 'critical' : 'high',
+      title: forecast.title,
+      summary: forecast.summary,
+      source: 'anticipatory',
+      sourceId: forecast.fingerprint,
+      action: forecast.recommendedAction,
+    });
+  }
+
   for (const relationship of relationships.relationships) {
     if (relationship.status === 'inactive') continue;
     const material = relationship.strategicValue === 'critical' || relationship.strategicValue === 'high';
@@ -142,7 +162,7 @@ async function collectCandidates(profileId: string): Promise<NotificationCandida
     });
   }
 
-  return result.slice(0, 80);
+  return result.slice(0, 100);
 }
 
 export async function refreshNotifications(profileId: string) {
