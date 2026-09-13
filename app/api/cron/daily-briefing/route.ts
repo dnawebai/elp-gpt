@@ -1,23 +1,18 @@
 import { NextResponse } from 'next/server';
 import { executeComposioTool } from '@/lib/composio';
+import { isCronRequestAuthorised } from '@/lib/cron-auth';
 import { getBriefingEmailConfig, getBriefingHour, getBriefingTimezone, getOwnerProfileId, localDateParts } from '@/lib/owner';
 import { generateProactiveBriefing } from '@/lib/proactive';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-function isAuthorised(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return false;
-  return request.headers.get('authorization') === `Bearer ${secret}`;
-}
-
 function emailBody(summary: string, timezone: string, generatedAt: string) {
   return `JARBIS Executive Daily Briefing\nGenerated: ${generatedAt}\nTimezone: ${timezone}\n\n${summary}\n\nThis briefing was generated in read-only mode. No external changes were made.`;
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorised(request)) {
+  if (!isCronRequestAuthorised(request)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
   }
 

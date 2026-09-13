@@ -1,18 +1,13 @@
 import { NextResponse } from 'next/server';
+import { isCronRequestAuthorised } from '@/lib/cron-auth';
 import { getBriefingTimezone, getOwnerProfileId, localDateParts } from '@/lib/owner';
 import { hasCompletedRadarRun, scanOpportunityRadar } from '@/lib/radar';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-function isAuthorised(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return false;
-  return request.headers.get('authorization') === `Bearer ${secret}`;
-}
-
 export async function GET(request: Request) {
-  if (!isAuthorised(request)) {
+  if (!isCronRequestAuthorised(request)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
   }
 

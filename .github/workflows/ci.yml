@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "feat/**"]
+    branches: [main, "feat/**", "fix/**"]
   pull_request:
     branches: [main]
 
@@ -20,5 +20,6 @@ jobs:
           node-version: 22
       - run: npm install --package-lock-only
       - run: npm ci
+      - run: npm test
       - run: npm run typecheck
       - run: npm run build

@@ -1,5 +1,6 @@
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { getElpSessionSecret } from '@/lib/elp-config';
+import { mintSignedToken, verifySignedToken } from '@/lib/token-codec';
 
 export const PROFILE_COOKIE = 'elp_profile';
 
@@ -34,33 +35,12 @@ function secretInfo(): { secret: string; mode: SecurityMode } {
   return { secret: 'elp-gpt-development-only-no-provider-secret', mode: 'development' };
 }
 
-function sign(encodedPayload: string) {
-  return createHmac('sha256', secretInfo().secret).update(encodedPayload).digest('base64url');
-}
-
-function safeEqual(a: string, b: string) {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
-
 function mint<T extends object>(claims: T) {
-  const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
-  return `${payload}.${sign(payload)}`;
+  return mintSignedToken(secretInfo().secret, claims);
 }
 
-function verify<T>(token: string | undefined): T | null {
-  if (!token) return null;
-  const [payload, signature, extra] = token.split('.');
-  if (!payload || !signature || extra || !safeEqual(signature, sign(payload))) return null;
-
-  try {
-    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as T & { exp?: number };
-    if (typeof parsed.exp !== 'number' || parsed.exp <= Math.floor(Date.now() / 1000)) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+function verify<T extends { exp?: number }>(token: string | undefined): T | null {
+  return verifySignedToken<T>(secretInfo().secret, token);
 }
 
 export function createProfileToken(profileId: string = randomUUID()) {
