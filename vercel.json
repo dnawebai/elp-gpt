@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/relationship-intelligence",
       "schedule": "31 */8 * * *"
+    },
+    {
+      "path": "/api/cron/notifications",
+      "schedule": "7 * * * *"
     }
   ]
 }
