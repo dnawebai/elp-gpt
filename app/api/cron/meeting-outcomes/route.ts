@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isCronRequestAuthorised } from '@/lib/cron-auth';
 import { evaluateDueMeetingOutcomes } from '@/lib/meeting-outcome-evaluator';
 import { getMeetingOutcome, createMeetingOutcome } from '@/lib/outcome-memory';
 import { listMeetings } from '@/lib/meeting-copilot';
@@ -7,14 +8,8 @@ import { getOwnerProfileId } from '@/lib/owner';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-function authorised(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return false;
-  return request.headers.get('authorization') === `Bearer ${secret}`;
-}
-
 export async function GET(request: Request) {
-  if (!authorised(request)) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+  if (!isCronRequestAuthorised(request)) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   const profileId = getOwnerProfileId();
   if (!profileId) return NextResponse.json({ error: 'Stable owner mode is required.' }, { status: 503 });
   try {
