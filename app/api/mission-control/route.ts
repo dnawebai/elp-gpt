@@ -15,6 +15,7 @@ import { listProtectedBlocks } from '@/lib/protected-blocks';
 import { getRadarSnapshot } from '@/lib/radar';
 import { getRelationshipSnapshot } from '@/lib/relationship-memory';
 import { PROFILE_COOKIE, verifyProfileToken } from '@/lib/security';
+import { getSubscriptionLifecycleSnapshot } from '@/lib/subscription-lifecycle';
 import { getTaskBoard } from '@/lib/task-router';
 
 export const runtime = 'nodejs';
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
   const profile = profileFrom(request);
   if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
   await ensureBaselineEventStatus(profile.profileId).catch(() => undefined);
-  const [plan, schedule, interrupt, board, portfolio, capacity, relationships, notifications, ledger, radar, diff, protectedBlocks, eventSubscriptions, communications, deviceCommands, phone] = await Promise.all([
+  const [plan, schedule, interrupt, board, portfolio, capacity, relationships, notifications, ledger, radar, diff, protectedBlocks, eventSubscriptions, communications, subscriptionLifecycle, deviceCommands, phone] = await Promise.all([
     getLatestDailyOperatingPlan(profile.profileId),
     getLatestExecutionSchedule(profile.profileId),
     getLatestInterruptSnapshot(profile.profileId),
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
     listProtectedBlocks(profile.profileId),
     listEventSubscriptions(profile.profileId),
     getCommunicationsSyncSnapshot(profile.profileId),
+    getSubscriptionLifecycleSnapshot(profile.profileId),
     listDeviceCommands(profile.profileId, 30),
     getPhoneReadiness(profile.profileId),
   ]);
@@ -70,6 +72,7 @@ export async function GET(request: Request) {
     protectedBlocks: protectedBlocks.slice(0, 100),
     eventSubscriptions,
     communications,
+    subscriptionLifecycle,
     device: { agentConfigured: deviceAgentConfigured(), commands: deviceCommands },
     phone,
   }, { headers: { 'Cache-Control': 'no-store, private' } });
