@@ -29,6 +29,24 @@ function parseInboundEvent(message: { id: string; createdAt: string; metadata: R
   };
 }
 
+function providerExecutionError(value: unknown) {
+  const queue: unknown[] = [value];
+  while (queue.length) {
+    const item = queue.shift();
+    if (!item || typeof item !== 'object') continue;
+    if (Array.isArray(item)) { queue.push(...item); continue; }
+    const record = item as Record<string, unknown>;
+    if (record.successful === false) {
+      if (typeof record.error === 'string' && record.error.trim()) return record.error.trim();
+      const data = record.data && typeof record.data === 'object' ? record.data as Record<string, unknown> : null;
+      if (typeof data?.message === 'string' && data.message.trim()) return data.message.trim();
+      return 'Provider tool execution reported failure.';
+    }
+    queue.push(...Object.values(record));
+  }
+  return null;
+}
+
 export async function listEventSubscriptions(profileId: string) { const handles = await sessionFor(profileId); if (!handles) return [] as EventSubscription[]; const messages = await listHonchoMessages(handles.session, { pageSize: 100, maxPages: 20, reverse: true }); const byProvider = new Map<EventProvider, EventSubscription>(); for (const message of messages) { const item = parseSubscription(message); if (item && !byProvider.has(item.provider)) byProvider.set(item.provider, item); } return [...byProvider.values()]; }
 
 export async function listRecentInboundEvents(profileId: string, hours = 6, maxItems = 100) {
@@ -61,10 +79,13 @@ export async function createGoogleCalendarWatch(profileId: string, callbackUrl: 
   const handles = await sessionFor(profileId); if (!handles) throw new Error('Event fabric storage is unavailable.');
   const channelId = randomUUID(); const token = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
   const result = await executeComposioTool({ toolSlug: 'GOOGLECALENDAR_EVENTS_WATCH', arguments: { calendarId: 'primary', id: channelId, address: callbackUrl, type: 'web_hook', token, params: { ttl: '604800' }, payload: false }, profileId });
+  const executionError = providerExecutionError(result);
+  if (executionError) throw new Error(`Calendar watch creation failed: ${executionError.slice(0, 500)}`);
   const objects: Record<string, unknown>[] = []; const walk = (v: unknown) => { if (!v || typeof v !== 'object') return; if (Array.isArray(v)) return v.forEach(walk); const o = v as Record<string, unknown>; objects.push(o); Object.values(o).forEach(walk); }; walk(result);
   const match = objects.find((o) => typeof o.id === 'string' && (o.id === channelId || typeof o.resourceId === 'string' || typeof o.resource_id === 'string')); const resourceId = match && typeof (match.resourceId || match.resource_id) === 'string' ? String(match.resourceId || match.resource_id) : undefined; const expirationRaw = match?.expiration; const expiresAt = typeof expirationRaw === 'string' || typeof expirationRaw === 'number' ? new Date(Number(expirationRaw) > 2e12 ? Number(expirationRaw) : String(expirationRaw)).toISOString() : undefined;
+  if (!resourceId) throw new Error('Calendar watch creation returned no resource identifier; refusing to record a false active subscription.');
   const now = new Date().toISOString(); const subscriptionId = randomUUID();
-  await handles.session.addMessages([{ peerId: handles.elp.id, content: `[EVENT_SUBSCRIPTION] google_calendar: active`, metadata: { elpEventSubscription: true, recordVersion: 1, subscriptionId, provider: 'google_calendar', status: 'active', channelId, token, resourceId: resourceId || '', expiresAt: expiresAt || '', callbackUrl, note: 'Google Calendar push channel for event changes.', createdAt: now, updatedAt: now } }]);
+  await handles.session.addMessages([{ peerId: handles.elp.id, content: `[EVENT_SUBSCRIPTION] google_calendar: active`, metadata: { elpEventSubscription: true, recordVersion: 1, subscriptionId, provider: 'google_calendar', status: 'active', channelId, token, resourceId, expiresAt: expiresAt || '', callbackUrl, note: 'Google Calendar push channel for event changes.', createdAt: now, updatedAt: now } }]);
   return { id: subscriptionId, provider: 'google_calendar' as const, status: 'active' as const, channelId, resourceId, expiresAt, callbackUrl, createdAt: now, updatedAt: now };
 }
 

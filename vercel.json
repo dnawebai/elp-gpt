@@ -16,6 +16,7 @@
     { "path": "/api/cron/daily-operating-plan", "schedule": "47 */2 * * *" },
     { "path": "/api/cron/execution-schedule", "schedule": "17 * * * *" },
     { "path": "/api/cron/interrupt-manager", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/communications-sync", "schedule": "*/2 * * * *" }
+    { "path": "/api/cron/communications-sync", "schedule": "*/2 * * * *" },
+    { "path": "/api/cron/subscription-lifecycle", "schedule": "13 */6 * * *" }
   ]
 }
