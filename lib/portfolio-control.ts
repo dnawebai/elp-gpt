@@ -362,8 +362,8 @@ function deriveGoalHealth(goal: GoalRecord, taskById: Map<string, { status: stri
   const reasons: string[] = [];
   let health: PortfolioHealth = 'healthy';
   if (goal.status === 'at_risk') { health = 'at_risk'; reasons.push('Goal is explicitly marked at risk.'); }
-  if (blockedTasks > 0) { health = health === 'critical' ? health : 'at_risk'; reasons.push(`${blockedTasks} linked task${blockedTasks === 1 ? '' : 's'} blocked.`); }
-  if (delegatedStale > 0) { health = health === 'critical' ? health : 'at_risk'; reasons.push(`${delegatedStale} delegated item${delegatedStale === 1 ? '' : 's'} missed the check-in cadence.`); }
+  if (blockedTasks > 0) { health = 'at_risk'; reasons.push(`${blockedTasks} linked task${blockedTasks === 1 ? '' : 's'} blocked.`); }
+  if (delegatedStale > 0) { health = 'at_risk'; reasons.push(`${delegatedStale} delegated item${delegatedStale === 1 ? '' : 's'} missed the check-in cadence.`); }
   if (riskIds.has(goal.id)) { health = 'at_risk'; reasons.push('Anticipatory forecast references this goal as exposed.'); }
   if (dueInDays !== null && dueInDays < 0 && goal.status !== 'achieved') { health = 'critical'; reasons.push(`Goal is ${Math.abs(dueInDays)} day${Math.abs(dueInDays) === 1 ? '' : 's'} overdue.`); }
   else if (dueInDays !== null && dueInDays <= 3 && progress < 80 && goal.status !== 'achieved') { health = 'critical'; reasons.push(`Due in ${Math.max(0, dueInDays)} days with ${progress}% recorded progress.`); }
