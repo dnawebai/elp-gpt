@@ -1,3 +1,4 @@
+import { cognitivePolicyToPrompt, getCognitivePolicySnapshot } from '@/lib/cognitive-policy';
 import { EXECUTIVE_DOCTRINE } from '@/lib/executive-doctrine';
 import {
   executiveLedgerToPrompt,
@@ -11,6 +12,7 @@ import { getNotificationCenter, notificationCenterToPrompt } from '@/lib/notific
 import { getMeetingOutcomeSnapshot, meetingOutcomeSnapshotToPrompt } from '@/lib/outcome-memory';
 import { getRelationshipSnapshot, relationshipSnapshotToPrompt } from '@/lib/relationship-memory';
 import { skillsToPrompt } from '@/lib/skills';
+import { getStoredStrategyCalibration, strategyCalibrationToPrompt } from '@/lib/strategy-calibration-memory';
 import { getTaskBoard, taskBoardToPrompt } from '@/lib/task-router';
 
 export type ChatMessage = {
@@ -45,6 +47,14 @@ Operating style:
 - Never claim an external action completed unless a tool result confirms it.
 - For consequential, destructive, financial, legal, security-sensitive, privacy-sensitive, or irreversible actions, require explicit approval before execution.
 - Prefer reversible actions and least privilege.
+
+Cognitive governance:
+- Personal Constitution entries are explicit user policy. Never invent additional principles, infer hidden values, or silently weaken a hard constraint.
+- Commander’s Intent supplies purpose and desired end state, not permission to bypass approval rules or safety controls.
+- Evidence registry entries marked supported or contradicted should update reasoning proportionally to their confidence and provenance. Unverified evidence remains uncertain.
+- Historical strategy calibration is a diagnostic signal, not truth. Weak historical forecasting dimensions should receive more scrutiny; never distort facts to fit calibration.
+- Surface material uncertainty rather than hiding it. When assumptions dominate the conclusion, identify the assumption and the evidence that would resolve it.
+- Separate activity from outcomes. Completion of an action is not evidence that the objective succeeded.
 
 Action planning:
 - Identify the smallest skill or combination of skills that can complete the request.
@@ -100,7 +110,7 @@ export function getReasoningProvider(): ReasoningProvider | null {
 }
 
 export async function buildElpSystemPrompt(profileId: string, sessionId: string) {
-  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes] = await Promise.all([
+  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes, cognitivePolicy, calibration] = await Promise.all([
     getMemorySnapshot(profileId, sessionId),
     getExecutiveMemorySnapshot(profileId),
     getExecutiveLedger(profileId),
@@ -108,6 +118,8 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
     getRelationshipSnapshot(profileId),
     getNotificationCenter(profileId),
     getMeetingOutcomeSnapshot(profileId),
+    getCognitivePolicySnapshot(profileId),
+    getStoredStrategyCalibration(profileId),
   ]);
   const memoryText = memoryToPrompt(memory);
   const executiveText = executiveMemoryToPrompt(executiveMemory);
@@ -116,9 +128,13 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
   const relationshipText = relationshipSnapshotToPrompt(relationships);
   const notificationText = notificationCenterToPrompt(notifications);
   const outcomeText = meetingOutcomeSnapshotToPrompt(meetingOutcomes);
+  const cognitiveText = cognitivePolicyToPrompt(cognitivePolicy);
+  const calibrationText = strategyCalibrationToPrompt(calibration);
   const sections = [
     ELP_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
+    cognitiveText ? `COGNITIVE POLICY:\n${cognitiveText}` : '',
+    calibrationText ? `DECISION CALIBRATION:\n${calibrationText}` : '',
     lifeOperatorPrompt(),
     `AVAILABLE ELP SKILLS:\n${skillsToPrompt()}`,
     notificationText ? `PRIORITY NOTIFICATIONS:\n${notificationText}` : '',
