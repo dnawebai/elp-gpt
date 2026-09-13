@@ -140,15 +140,16 @@ test('quiet hours suppress non-critical delivery but never critical alerts', () 
   };
   const now = new Date('2026-09-13T23:30:00.000Z');
   assert.equal(isQuietHours(preferences, now), true);
-  assert.equal(shouldDeliverNotification({ channel: 'email', severity: 'high', kind: 'approval', lastSeenAt: '2026-09-13T22:00:00.000Z', preferences, now }), false);
-  assert.equal(shouldDeliverNotification({ channel: 'email', severity: 'critical', kind: 'approval', lastSeenAt: '2026-09-13T22:00:00.000Z', preferences, now }), true);
+  assert.equal(shouldDeliverNotification({ channel: 'email', severity: 'high', kind: 'approval', firstSeenAt: '2026-09-13T22:00:00.000Z', preferences, now }), false);
+  assert.equal(shouldDeliverNotification({ channel: 'email', severity: 'critical', kind: 'approval', firstSeenAt: '2026-09-13T22:00:00.000Z', preferences, now }), true);
 });
 
 test('notification delivery keys change with occurrence or alert update', () => {
-  const base = { id: 'note-1', occurrenceCount: 1, updatedAt: '2026-09-13T12:00:00.000Z' };
+  const base = { id: 'note-1', title: 'Approval required', summary: 'Approve this action.', severity: 'high' };
   assert.equal(deliveryKey(base, 'push'), deliveryKey(base, 'push'));
-  assert.notEqual(deliveryKey(base, 'push'), deliveryKey({ ...base, occurrenceCount: 2 }, 'push'));
-  assert.notEqual(deliveryKey(base, 'push'), deliveryKey({ ...base, updatedAt: '2026-09-13T13:00:00.000Z' }, 'push'));
+  assert.equal(deliveryKey(base, 'push'), deliveryKey({ ...base }, 'push'));
+  assert.notEqual(deliveryKey(base, 'push'), deliveryKey({ ...base, summary: 'Approval changed.' }, 'push'));
+  assert.notEqual(deliveryKey(base, 'push'), deliveryKey(base, 'email'));
 });
 
 test('operator task transitions route approvals and verified completion correctly', () => {
