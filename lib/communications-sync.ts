@@ -213,7 +213,7 @@ async function syncGmail(profileId: string, account: { id?: string; label: strin
     }
 
     let historyResult: unknown = null;
-    if (!state.pendingGmail.length || state.pageToken) {
+    if (!state.pendingGmail.length) {
       historyResult = await executeComposioTool({ toolSlug: 'GMAIL_LIST_HISTORY', arguments: { user_id: 'me', start_history_id: state.cursor, max_results: 100, history_types: ['messageAdded'], ...(state.pageToken ? { page_token: state.pageToken } : {}) }, profileId, connectedAccountId: account.id });
       const history = findArray(historyResult, 'history');
       const additions = gmailAdded(history);
@@ -296,7 +296,7 @@ async function syncOutlook(profileId: string, account: { id?: string; label: str
   const now = new Date().toISOString();
   state.lastAttemptAt = now;
   try {
-    if (!state.initialized || !state.cursor) {
+    if (!state.initialized || (!state.cursor && !state.pageToken)) {
       const baseline = await executeComposioTool({ toolSlug: 'OUTLOOK_GET_MAIL_DELTA', arguments: { user_id: 'me', folder_id: 'inbox', top: 1, select: ['id','subject','from','receivedDateTime','importance','webLink'] }, profileId, connectedAccountId: account.id });
       const page = outlookPage(baseline);
       const cursor = page.deltaLink || page.nextLink;
@@ -309,13 +309,14 @@ async function syncOutlook(profileId: string, account: { id?: string; label: str
     const args: Record<string, unknown> = { user_id: 'me', folder_id: 'inbox', top: 100, select: ['id','subject','from','receivedDateTime','importance','webLink'] };
     if (state.pageToken) args.skip_token = state.pageToken;
     else args.delta_token = state.cursor;
+    const suppressExisting = !state.baselineComplete;
     const response = await executeComposioTool({ toolSlug: 'OUTLOOK_GET_MAIL_DELTA', arguments: args, profileId, connectedAccountId: account.id });
     const page = outlookPage(response);
     let newEvents = 0;
     let processed = 0;
     for (const raw of page.items.slice(0, 100)) {
       const item = outlookMessage(raw); if (!item) continue; processed += 1;
-      if (!recentEnough(item.receivedAt)) continue;
+      if (suppressExisting || !recentEnough(item.receivedAt)) continue;
       await recordInboundEvent(profileId, { provider: 'outlook', type: 'message_received', sourceId: item.id, summary: `${item.subject || 'New Outlook message'}${item.sender ? ` — ${item.sender}` : ''}`, metadata: { subject: item.subject, sender: item.sender, receivedAt: item.receivedAt, importance: item.importance, important: item.importance === 'high', url: item.url, accountId: account.id || '' } });
       newEvents += 1;
     }
