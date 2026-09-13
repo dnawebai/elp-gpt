@@ -320,7 +320,14 @@ export async function prepareNegotiationBrief(args: {
   if (!target) throw new Error('A counterpart or negotiation target is required.');
   const [relationships, ledger] = await Promise.all([getRelationshipSnapshot(args.profileId), getExecutiveLedger(args.profileId)]);
   const query = target.toLowerCase();
-  const match = relationships.relationships.find((record) => [record.name, record.organization || '', record.email || ''].some((value) => value.toLowerCase().includes(query) || query.includes(value.toLowerCase()))) || null;
+  const match = relationships.relationships.find((record) =>
+    [record.name, record.organization, record.email]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .some((value) => {
+        const normalized = value.toLowerCase();
+        return normalized.includes(query) || query.includes(normalized);
+      }),
+  ) || null;
   const dossier = match ? JSON.stringify({
     id: match.id,
     name: match.name,
