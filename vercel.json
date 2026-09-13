@@ -26,6 +26,10 @@
       "schedule": "23 */2 * * *"
     },
     {
+      "path": "/api/cron/anticipatory-chief-of-staff",
+      "schedule": "37 */3 * * *"
+    },
+    {
       "path": "/api/cron/meeting-outcomes",
       "schedule": "43 */6 * * *"
     }
