@@ -25,7 +25,7 @@ async function execute(command) {
     case 'open_url':
       if (!/^https:\/\//i.test(command.target || '')) throw new Error('Rejected non-HTTPS URL.');
       if (platform === 'darwin') return run('/usr/bin/open', [command.target]);
-      if (platform === 'win32') return run('cmd.exe', ['/d', '/c', 'start', '', command.target]);
+      if (platform === 'win32') return run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Start-Process -FilePath $args[0]', command.target]);
       return run('xdg-open', [command.target]);
     case 'open_app':
       if (!/^[\w .-]{1,120}$/.test(command.target || '')) throw new Error('Rejected application name.');
