@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getStrategicSimulation, listStrategicSimulations, promoteStrategicSimulation, runStrategicSimulation } from '@/lib/strategic-simulation';
+import { cognitivePolicyToPrompt, getCognitivePolicySnapshot } from '@/lib/cognitive-policy';
+import { ensureDecisionOutcomes } from '@/lib/decision-learning';
 import { PROFILE_COOKIE, sanitizeId, verifyProfileToken } from '@/lib/security';
+import { getStoredStrategyCalibration, strategyCalibrationToPrompt } from '@/lib/strategy-calibration-memory';
+import { getStrategicSimulation, listStrategicSimulations, promoteStrategicSimulation, runStrategicSimulation } from '@/lib/strategic-simulation';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -41,6 +44,7 @@ export async function POST(request: Request) {
       const simulationId = typeof body?.simulationId === 'string' ? body.simulationId.trim() : '';
       if (!simulationId) return NextResponse.json({ error: 'simulationId is required.' }, { status: 400 });
       const result = await promoteStrategicSimulation(profile.profileId, simulationId);
+      await ensureDecisionOutcomes(profile.profileId).catch(() => undefined);
       return NextResponse.json({ ok: true, ...result }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
     const decision = typeof body?.decision === 'string' ? body.decision.trim() : '';
@@ -51,16 +55,26 @@ export async function POST(request: Request) {
       if (typeof obj.description !== 'string' || !obj.description.trim()) return [];
       return [{ label: typeof obj.label === 'string' ? obj.label : undefined, description: obj.description }];
     }) : undefined;
+    const [policy, calibration] = await Promise.all([
+      getCognitivePolicySnapshot(profile.profileId),
+      getStoredStrategyCalibration(profile.profileId),
+    ]);
+    const suppliedContext = typeof body?.context === 'string' ? body.context.trim() : '';
+    const enrichedContext = [
+      suppliedContext,
+      cognitivePolicyToPrompt(policy),
+      strategyCalibrationToPrompt(calibration),
+    ].filter(Boolean).join('\n\n');
     const simulation = await runStrategicSimulation({
       decision,
       objective: typeof body?.objective === 'string' ? body.objective : undefined,
-      context: typeof body?.context === 'string' ? body.context : undefined,
+      context: enrichedContext || undefined,
       options,
       profileId: profile.profileId,
       sessionId: sanitizeId(body?.sessionId, 'strategic-simulation'),
       persist: true,
     });
-    return NextResponse.json({ ok: true, simulation }, { headers: { 'Cache-Control': 'no-store, private' } });
+    return NextResponse.json({ ok: true, simulation, cognitiveContextApplied: Boolean(policy.constitution || policy.intent || policy.evidence.length || calibration) }, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Strategic simulation failed.' }, { status: 500 });
   }
