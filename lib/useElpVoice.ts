@@ -36,7 +36,8 @@ type VoiceSessionConfig = {
 
 type VoicePostExecution =
   | { kind: 'meeting-follow-up'; meetingId: string; index: number }
-  | { kind: 'meeting-calendar'; meetingId: string; summary: string };
+  | { kind: 'meeting-calendar'; meetingId: string; summary: string }
+  | { kind: 'commitment-fulfilment'; recordId: string };
 
 type OperatorPendingVoiceAction = {
   toolSlug: string;
@@ -64,6 +65,7 @@ Use jarbis_command for JARBIS-native executive intelligence.
 For a negotiation request, pass the counterpart in target and the desired outcome in objective when known.
 For a post-meeting email request such as "send the first follow-up from yesterday's meeting", call jarbis_command with command="meeting_follow_up", meeting set to the user's meeting reference, and followUpNumber set to the requested one-based number. The returned action is approval-required. Describe the exact recipient/action and ask for approval; never approve it yourself.
 For a calendar follow-up such as "schedule the follow-up call Tuesday at 2 PM", call jarbis_command with command="meeting_schedule", meeting set to the relevant meeting reference, scheduleRequest containing the user's date/time wording, durationMinutes if stated, and inviteParticipants=true unless the user explicitly says not to invite them. The server resolves relative dates against the browser timezone and returns an exact approval-required calendar action.
+When the user asks what ELP is doing about open obligations, what commitments need action, or what autonomous work is waiting, use command="fulfilment". When the user explicitly asks ELP to work through, advance, review, or fulfil open commitments now, use command="fulfilment_run". ELP may autonomously perform read-only research and internal preparation, but any external write returned by fulfilment remains approval-required. Describe only the single exact pending action being proposed and ask for approval.
 For external apps not covered by a native JARBIS command, first use search_tools to discover a suitable Composio tool, then use prepare_action with the exact slug and arguments.
 Read-only actions can run immediately when directly requested. Any write or consequential action must be prepared first and requires explicit user approval. Ask for approval plainly, then call approve_action only after the user clearly approves. If the user declines, call reject_action.
 Never claim an external action happened unless the tool result confirms it. Never reinterpret approval for changed arguments.
@@ -78,11 +80,11 @@ const UI_FUNCTIONS = [
   { name: 'find_skills', description: 'Search ELP first-party skills.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
   {
     name: 'jarbis_command',
-    description: 'Invoke a native JARBIS executive capability directly by voice, including approval-gated post-meeting email and calendar actions.',
+    description: 'Invoke a native JARBIS executive capability directly by voice, including autonomous commitment fulfilment and approval-gated external actions.',
     parameters: {
       type: 'object',
       properties: {
-        command: { type: 'string', enum: ['mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center', 'meeting_follow_up', 'meeting_schedule'] },
+        command: { type: 'string', enum: ['mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center', 'meeting_follow_up', 'meeting_schedule', 'fulfilment', 'fulfilment_run'] },
         objective: { type: 'string' },
         target: { type: 'string' },
         context: { type: 'string' },
@@ -92,6 +94,7 @@ const UI_FUNCTIONS = [
         scheduleRequest: { type: 'string', description: 'Date/time wording such as Tuesday at 2 PM.' },
         durationMinutes: { type: 'number' },
         inviteParticipants: { type: 'boolean' },
+        limit: { type: 'number', description: 'Maximum obligations to review in one fulfilment run, up to 6.' },
       },
       required: ['command'],
     },

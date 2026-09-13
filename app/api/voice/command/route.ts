@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getCommitmentFulfilmentSnapshot, runCommitmentFulfilmentCycle } from '@/lib/commitment-fulfilment';
 import { getExecutiveLedger } from '@/lib/executive-memory';
 import { prepareVoiceMeetingCalendar, prepareVoiceMeetingEmail } from '@/lib/meeting-voice-actions';
 import { prepareNegotiationBrief } from '@/lib/relationship-intelligence';
@@ -25,7 +26,9 @@ type VoiceCommand =
   | 'commitments'
   | 'command_center'
   | 'meeting_follow_up'
-  | 'meeting_schedule';
+  | 'meeting_schedule'
+  | 'fulfilment'
+  | 'fulfilment_run';
 
 function readProfile(request: Request) {
   const value = (request.headers.get('cookie') || '')
@@ -64,6 +67,18 @@ function compactLedger(kind?: 'commitment') {
   };
 }
 
+function compactFulfilment(records: Awaited<ReturnType<typeof getCommitmentFulfilmentSnapshot>>['records']) {
+  return records.slice(0, 10).map((record) => ({
+    id: record.id,
+    targetType: record.targetType,
+    title: record.title,
+    status: record.status,
+    summary: clip(record.summary, 700),
+    question: record.question,
+    nextReviewAt: record.nextReviewAt,
+  }));
+}
+
 export async function POST(request: Request) {
   const profile = readProfile(request);
   if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
@@ -81,11 +96,12 @@ export async function POST(request: Request) {
     scheduleRequest?: unknown;
     durationMinutes?: unknown;
     inviteParticipants?: unknown;
+    limit?: unknown;
   } | null;
 
   const command = typeof body?.command === 'string' ? body.command as VoiceCommand : null;
   const allowed = new Set<VoiceCommand>([
-    'mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center', 'meeting_follow_up', 'meeting_schedule',
+    'mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center', 'meeting_follow_up', 'meeting_schedule', 'fulfilment', 'fulfilment_run',
   ]);
   if (!command || !allowed.has(command)) return NextResponse.json({ error: 'Unsupported JARBIS voice command.' }, { status: 400 });
 
@@ -123,6 +139,34 @@ export async function POST(request: Request) {
         inviteParticipants: body?.inviteParticipants !== false,
       });
       return NextResponse.json({ ok: true, command, status: 'approval_required', summary: pendingAction.summary, pendingAction }, { headers: { 'Cache-Control': 'no-store, private' } });
+    }
+
+    if (command === 'fulfilment' || command === 'fulfilment_run') {
+      if (command === 'fulfilment_run') {
+        const limit = typeof body?.limit === 'number' && Number.isFinite(body.limit) ? Math.max(1, Math.min(6, Math.round(body.limit))) : 4;
+        const cycle = await runCommitmentFulfilmentCycle({ profileId: profile.profileId, sessionPrefix: `voice-fulfilment-${sessionId}`, limit, force: false });
+        const pending = cycle.results.find((record) => record.status === 'approval_required' && record.pendingAction);
+        return NextResponse.json({
+          ok: true,
+          command,
+          status: pending ? 'approval_required' : cycle.needsInput ? 'needs_input' : cycle.blocked && !cycle.completed ? 'blocked' : 'completed',
+          summary: `Reviewed ${cycle.reviewed} obligation${cycle.reviewed === 1 ? '' : 's'}: ${cycle.completed} completed, ${cycle.approvalRequired} awaiting approval, ${cycle.needsInput} needing input, ${cycle.blocked} blocked.`,
+          records: compactFulfilment(cycle.results),
+          ...(pending?.pendingAction ? { pendingAction: { ...pending.pendingAction, postExecution: { kind: 'commitment-fulfilment', recordId: pending.id } } } : {}),
+        }, { headers: { 'Cache-Control': 'no-store, private' } });
+      }
+
+      const snapshot = await getCommitmentFulfilmentSnapshot(profile.profileId);
+      const live = snapshot.records.filter((record) => record.status !== 'completed');
+      const pending = live.find((record) => record.status === 'approval_required' && record.pendingAction);
+      return NextResponse.json({
+        ok: true,
+        command,
+        status: pending ? 'approval_required' : live.some((record) => record.status === 'needs_input') ? 'needs_input' : live.length ? 'blocked' : 'completed',
+        stats: snapshot.stats,
+        records: compactFulfilment(live),
+        ...(pending?.pendingAction ? { pendingAction: { ...pending.pendingAction, postExecution: { kind: 'commitment-fulfilment', recordId: pending.id } } } : {}),
+      }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
     if (command === 'attention' || command === 'daily_briefing' || command === 'meeting_prep') {
