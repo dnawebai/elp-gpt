@@ -7,7 +7,7 @@ import {
 } from '@/lib/executive-memory';
 import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
 import { lifeOperatorPrompt } from '@/lib/life-operator';
-import { getNotificationCenter, notificationCenterToPrompt } from '@/lib/notifications';
+import { getNotificationCenter, notificationCenterToPrompt } from '@/lib/notification-store';
 import { getRelationshipSnapshot, relationshipSnapshotToPrompt } from '@/lib/relationship-memory';
 import { skillsToPrompt } from '@/lib/skills';
 import { getTaskBoard, taskBoardToPrompt } from '@/lib/task-router';
