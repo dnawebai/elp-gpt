@@ -110,6 +110,24 @@ function findArray(value: unknown, keys: string[]): unknown[] {
   return [];
 }
 
+function providerExecutionError(value: unknown) {
+  const queue: unknown[] = [value];
+  while (queue.length) {
+    const item = queue.shift();
+    if (!item || typeof item !== 'object') continue;
+    if (Array.isArray(item)) { queue.push(...item); continue; }
+    const record = item as Record<string, unknown>;
+    if (record.successful === false) {
+      if (typeof record.error === 'string' && record.error.trim()) return record.error.trim();
+      const data = record.data && typeof record.data === 'object' ? record.data as Record<string, unknown> : null;
+      if (typeof data?.message === 'string' && data.message.trim()) return data.message.trim();
+      return 'Provider tool execution reported failure.';
+    }
+    queue.push(...Object.values(record));
+  }
+  return null;
+}
+
 async function calendarHealth(profileId: string, now: Date): Promise<SubscriptionProviderHealth> {
   const checked = now.toISOString();
   try {
@@ -123,11 +141,13 @@ async function calendarHealth(profileId: string, now: Date): Promise<Subscriptio
     let cleanupNote = '';
     if (current?.status === 'active' && current.channelId && current.resourceId && current.channelId !== replacement.channelId) {
       try {
-        await executeComposioTool({
+        const stopResult = await executeComposioTool({
           toolSlug: 'GOOGLECALENDAR_CHANNELS_STOP',
           arguments: { id: current.channelId, resourceId: current.resourceId, ...(current.token ? { token: current.token } : {}) },
           profileId,
         });
+        const stopError = providerExecutionError(stopResult);
+        if (stopError) throw new Error(stopError);
         cleanupNote = ' Previous channel stopped after replacement became active.';
       } catch (error) {
         cleanupNote = ` Replacement is active; previous-channel cleanup will retry later (${clip(error instanceof Error ? error.message : 'cleanup failed', 180)}).`;
@@ -172,6 +192,8 @@ async function whatsappHealth(profileId: string, accounts: ConnectedAccountSumma
     const label = account.alias || account.label || 'WhatsApp Business';
     try {
       const result = await executeComposioTool({ toolSlug: 'WHATSAPP_GET_SUBSCRIBED_APPS', arguments: {}, profileId, connectedAccountId: account.id });
+      const healthError = providerExecutionError(result);
+      if (healthError) throw new Error(healthError);
       const subscribed = findArray(result, ['data', 'subscribed_apps', 'apps']);
       if (subscribed.length) {
         output.push({ id: randomUUID(), provider: 'whatsapp', accountId: account.id, accountLabel: label, mode: 'native_push', status: 'active', lastCheckedAt: checked, lastSuccessAt: checked, note: 'WhatsApp Business has an active native application webhook subscription.' });
@@ -180,7 +202,9 @@ async function whatsappHealth(profileId: string, accounts: ConnectedAccountSumma
       const verifyToken = process.env.ELP_WHATSAPP_VERIFY_TOKEN?.trim();
       const appSecret = process.env.ELP_WHATSAPP_APP_SECRET?.trim();
       if (verifyToken && appSecret) {
-        await executeComposioTool({ toolSlug: 'WHATSAPP_SUBSCRIBE_APP', arguments: { verify_token: verifyToken, override_callback_uri: `${publicBaseUrl()}/api/webhooks/whatsapp` }, profileId, connectedAccountId: account.id });
+        const subscribeResult = await executeComposioTool({ toolSlug: 'WHATSAPP_SUBSCRIBE_APP', arguments: { verify_token: verifyToken, override_callback_uri: `${publicBaseUrl()}/api/webhooks/whatsapp` }, profileId, connectedAccountId: account.id });
+        const subscribeError = providerExecutionError(subscribeResult);
+        if (subscribeError) throw new Error(subscribeError);
         output.push({ id: randomUUID(), provider: 'whatsapp', accountId: account.id, accountLabel: label, mode: 'native_push', status: 'renewed', lastCheckedAt: checked, lastSuccessAt: checked, action: 'subscribed', note: 'WhatsApp native webhook subscription was restored automatically.' });
       } else {
         output.push({ id: randomUUID(), provider: 'whatsapp', accountId: account.id, accountLabel: label, mode: 'native_push', status: 'pending_configuration', lastCheckedAt: checked, note: 'WhatsApp is connected, but direct ELP webhook activation remains fail-closed until webhook verification and signature validation configuration is present.' });
