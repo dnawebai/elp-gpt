@@ -1,16 +1,11 @@
 import { NextResponse } from 'next/server';
+import { isCronRequestAuthorised } from '@/lib/cron-auth';
 import { getBriefingTimezone, getOwnerProfileId } from '@/lib/owner';
 import { hasCompletedRelationshipRun } from '@/lib/relationship-memory';
 import { scanRelationshipIntelligence } from '@/lib/relationship-intelligence';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
-
-function isAuthorised(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return false;
-  return request.headers.get('authorization') === `Bearer ${secret}`;
-}
 
 function currentRunKey() {
   const now = new Date();
@@ -20,7 +15,7 @@ function currentRunKey() {
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorised(request)) {
+  if (!isCronRequestAuthorised(request)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
   }
 
