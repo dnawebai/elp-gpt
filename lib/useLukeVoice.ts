@@ -34,6 +34,13 @@ type VoiceSessionConfig = {
   reasoningProvider: string;
 };
 
+type OperatorPendingVoiceAction = {
+  toolSlug: string;
+  arguments: Record<string, unknown>;
+  summary: string;
+  risk: 'write' | 'high';
+};
+
 const VOICE_PROMPT = `You are LUKE, the voice-first intelligence system for ELP GPT.
 
 Relationship and voice manner:
@@ -51,9 +58,12 @@ Use profile navigation tools when the user asks to see memory, skills, signals, 
 Use get_system_status when asked whether services are online.
 Use find_skills when you need to identify LUKE's supported capability for an unfamiliar or multi-step request.
 Use get_device_context for local-time, timezone, locale, or connectivity context. For "near me", "close to me", or other location-dependent requests, call get_device_context with include_location=true before searching. Precise location requires the user's browser permission and must never be guessed.
+Use jarbis_command for JARBIS-native executive intelligence: running an Operator mission, asking what needs attention, requesting a daily brief or meeting prep, reading Opportunity Radar, reviewing relationships, preparing a negotiation, checking the Executive Ledger/commitments, or reading the Command Center. Prefer jarbis_command over manually recreating those capabilities with generic tools.
+For a negotiation request, pass the counterpart in target and the desired outcome in objective when known. Never invent negotiation facts or counterpart motives.
 For external apps, first use search_tools to discover a suitable Composio tool when you do not already know its exact slug. Then use prepare_action with the exact tool slug and arguments.
 Prefer authenticated APIs and connectors over visual browser automation. Use browser/computer control only when a direct integration is unavailable and the user has authorised the action.
 Read-only actions can run immediately when directly requested. Any write or consequential action must be prepared first and requires explicit user approval. Ask for approval plainly, then call approve_action only after the user clearly approves. If the user declines, call reject_action.
+When a JARBIS mission returns approval_required, describe exactly what is waiting and ask for approval. Do not call approve_action until the user explicitly says yes/approve/proceed.
 Never claim an external action happened unless the tool result confirms it. Never reinterpret approval for a different tool or changed arguments.
 Do not imitate fictional dialogue. LUKE is an original ELP GPT system.`;
 
@@ -106,6 +116,25 @@ const UI_FUNCTIONS = [
         query: { type: 'string', description: 'Short description of the requested capability or task.' },
       },
       required: ['query'],
+    },
+  },
+  {
+    name: 'jarbis_command',
+    description: 'Invoke a native JARBIS executive capability directly by voice. Use for Operator missions, attention/daily/meeting briefs, Opportunity Radar, relationship intelligence, negotiation preparation, Executive Ledger/commitments, and Command Center status.',
+    parameters: {
+      type: 'object',
+      properties: {
+        command: {
+          type: 'string',
+          enum: ['mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center'],
+        },
+        objective: { type: 'string', description: 'Mission objective or negotiation desired outcome when relevant.' },
+        target: { type: 'string', description: 'Counterpart/person/company for relationship or negotiation commands.' },
+        context: { type: 'string', description: 'Optional concise context supplied by the user.' },
+        meeting: { type: 'string', description: 'Optional meeting/person/company identifier for meeting prep.' },
+        query: { type: 'string', description: 'Optional filter for a relationship lookup.' },
+      },
+      required: ['command'],
     },
   },
   {
@@ -197,6 +226,7 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
   const micRef = useRef<AgentMicrophone | null>(null);
   const playerRef = useRef<AgentPlayer | null>(null);
   const lastTranscriptRef = useRef('');
+  const operatorPendingRef = useRef<OperatorPendingVoiceAction | null>(null);
   const [state, setState] = useState<'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error'>('idle');
 
   const stop = useCallback(() => {
@@ -217,6 +247,26 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, ...message }), keepalive: true,
     }).catch(() => undefined);
+  }, [sessionId]);
+
+  const runJarbisVoiceCommand = useCallback(async (input: Record<string, unknown>) => {
+    let timezone: string | undefined;
+    try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { timezone = undefined; }
+    const response = await fetch('/api/voice/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...input, sessionId, timezone }),
+      cache: 'no-store',
+    });
+    const data = await response.json().catch(() => ({ error: 'JARBIS voice command returned an invalid response.' })) as {
+      error?: string;
+      status?: string;
+      pendingAction?: OperatorPendingVoiceAction;
+      [key: string]: unknown;
+    };
+    if (!response.ok) return { ok: false, error: data.error || 'JARBIS voice command failed.' };
+    if (data.status === 'approval_required' && data.pendingAction) operatorPendingRef.current = data.pendingAction;
+    return data;
   }, [sessionId]);
 
   const start = useCallback(async () => {
@@ -299,6 +349,26 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
                 const response = await fetch(`/api/skills?q=${encodeURIComponent(query)}`, { cache: 'no-store' });
                 result = response.ok ? await response.json() : { ok: false, error: 'Skill discovery unavailable.' };
               }
+            } else if (fn.name === 'jarbis_command') {
+              result = await runJarbisVoiceCommand(input);
+            } else if (fn.name === 'approve_action' && operatorPendingRef.current && onCommand) {
+              const pending = operatorPendingRef.current;
+              const prepared = await onCommand({
+                name: 'prepare_action',
+                input: {
+                  tool_slug: pending.toolSlug,
+                  arguments: pending.arguments,
+                  summary: pending.summary,
+                },
+              }) as { ok?: boolean; status?: string; error?: string };
+              if (prepared?.status !== 'approval_required') result = prepared;
+              else {
+                result = await onCommand({ name: 'approve_action', input: {} });
+                if ((result as { ok?: boolean })?.ok !== false) operatorPendingRef.current = null;
+              }
+            } else if (fn.name === 'reject_action' && operatorPendingRef.current) {
+              operatorPendingRef.current = null;
+              result = onCommand ? await onCommand({ name: 'reject_action', input: {} }) : { ok: true, status: 'cancelled' };
             } else if (onCommand) result = await onCommand({ name: fn.name, input });
             else result = { ok: false, error: `No handler for ${fn.name}` };
             session.sendFunctionCallResponse(fn.id, fn.name, JSON.stringify(result ?? { ok: true }));
@@ -317,7 +387,7 @@ export function useLukeVoice({ enabled, sessionId, onMessage, onCommand, onError
       console.error('Unable to start LUKE voice', error); stop(); setState('error');
       onError?.(error instanceof Error ? error.message : 'Voice could not start.');
     }
-  }, [enabled, onCommand, onError, onMessage, persistMessage, sessionId, stop]);
+  }, [enabled, onCommand, onError, onMessage, persistMessage, runJarbisVoiceCommand, sessionId, stop]);
 
   useEffect(() => stop, [stop]);
   return {
