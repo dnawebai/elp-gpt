@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getExecutiveLedger } from '@/lib/executive-memory';
+import { prepareVoiceMeetingCalendar, prepareVoiceMeetingEmail } from '@/lib/meeting-voice-actions';
 import { prepareNegotiationBrief } from '@/lib/relationship-intelligence';
 import { getRelationshipSnapshot } from '@/lib/relationship-memory';
 import { runOperatorMission } from '@/lib/operator';
@@ -22,7 +23,9 @@ type VoiceCommand =
   | 'negotiation'
   | 'ledger'
   | 'commitments'
-  | 'command_center';
+  | 'command_center'
+  | 'meeting_follow_up'
+  | 'meeting_schedule';
 
 function readProfile(request: Request) {
   const value = (request.headers.get('cookie') || '')
@@ -74,11 +77,15 @@ export async function POST(request: Request) {
     meeting?: unknown;
     timezone?: unknown;
     query?: unknown;
+    followUpNumber?: unknown;
+    scheduleRequest?: unknown;
+    durationMinutes?: unknown;
+    inviteParticipants?: unknown;
   } | null;
 
   const command = typeof body?.command === 'string' ? body.command as VoiceCommand : null;
   const allowed = new Set<VoiceCommand>([
-    'mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center',
+    'mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center', 'meeting_follow_up', 'meeting_schedule',
   ]);
   if (!command || !allowed.has(command)) return NextResponse.json({ error: 'Unsupported JARBIS voice command.' }, { status: 400 });
 
@@ -101,6 +108,41 @@ export async function POST(request: Request) {
         summary: result.summary,
         question: result.question,
         pendingAction: result.pendingAction,
+      }, { headers: { 'Cache-Control': 'no-store, private' } });
+    }
+
+    if (command === 'meeting_follow_up') {
+      const meetingReference = meeting || target || 'latest';
+      const followUpNumber = typeof body?.followUpNumber === 'number' && Number.isFinite(body.followUpNumber)
+        ? Math.max(1, Math.round(body.followUpNumber))
+        : 1;
+      const pendingAction = await prepareVoiceMeetingEmail(profile.profileId, meetingReference, followUpNumber, timezone);
+      return NextResponse.json({
+        ok: true,
+        command,
+        status: 'approval_required',
+        summary: pendingAction.summary,
+        pendingAction,
+      }, { headers: { 'Cache-Control': 'no-store, private' } });
+    }
+
+    if (command === 'meeting_schedule') {
+      const meetingReference = meeting || target || 'latest';
+      const scheduleRequest = typeof body?.scheduleRequest === 'string' ? clip(body.scheduleRequest, 1200) : objective;
+      if (!scheduleRequest) return NextResponse.json({ error: 'A follow-up date/time is required.' }, { status: 400 });
+      const pendingAction = await prepareVoiceMeetingCalendar(profile.profileId, {
+        meetingReference,
+        scheduleRequest,
+        timezone,
+        durationMinutes: typeof body?.durationMinutes === 'number' ? body.durationMinutes : undefined,
+        inviteParticipants: body?.inviteParticipants !== false,
+      });
+      return NextResponse.json({
+        ok: true,
+        command,
+        status: 'approval_required',
+        summary: pendingAction.summary,
+        pendingAction,
       }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
