@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/notifications",
       "schedule": "7 * * * *"
+    },
+    {
+      "path": "/api/cron/meeting-outcomes",
+      "schedule": "43 */6 * * *"
     }
   ]
 }
