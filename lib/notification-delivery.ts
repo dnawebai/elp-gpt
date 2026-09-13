@@ -327,7 +327,7 @@ export async function deliverPriorityNotifications(profileId: string) {
     for (const channel of channels) {
       const key = deliveryKey(notification, channel);
       if (sentKeys.has(key)) continue;
-      if (!shouldDeliverNotification({ channel, severity: notification.severity, kind: notification.kind, lastSeenAt: notification.lastSeenAt, preferences })) continue;
+      if (!shouldDeliverNotification({ channel, severity: notification.severity, kind: notification.kind, firstSeenAt: notification.createdAt, preferences })) continue;
       try {
         const detail = await deliverChannel(profileId, notification, channel, preferences);
         await recordAttempt(profileId, notification, channel, 'sent', detail);
