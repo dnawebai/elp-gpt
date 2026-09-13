@@ -37,7 +37,7 @@ export default function CommitmentFulfilmentPage(){
   const [error,setError]=useState<string|null>(null);
 
   useEffect(()=>{
-    const existing=window.sessionStorage.getItem('elp-session-id')||window.sessionStorage.getItem('luke-session-id');
+    const existing=window.sessionStorage.getItem('elp-session-id');
     const id=existing||crypto.randomUUID();
     if(!existing) window.sessionStorage.setItem('elp-session-id',id);
     setSessionId(id);
