@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   try {
     const slot = Math.floor(Date.now() / (2 * 60 * 60 * 1000));
     const result = await runCommitmentFulfilmentCycle({ profileId, sessionPrefix: `autonomous-fulfilment-${slot}`, limit: 4, force: false });
-    return NextResponse.json({ ok: true, slot, ...result }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ ...result, slot }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('ELP commitment fulfilment cron failed', error);
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Commitment fulfilment cycle failed.' }, { status: 503 });
