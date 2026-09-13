@@ -71,12 +71,17 @@ function configureWebPush() {
 }
 
 export async function getDeliveryPreferences(profileId: string): Promise<NotificationDeliveryPreferences> {
-  const handles = await getDeliverySession(profileId);
-  if (!handles) return DEFAULT_NOTIFICATION_DELIVERY_PREFERENCES;
-  const page = await handles.session.messages({ size: 80, reverse: true });
-  const message = page.items.find((item) => item.metadata?.elpNotificationDeliveryPreferences === true);
-  const stored = parseJson<Partial<NotificationDeliveryPreferences>>(message?.metadata?.preferencesJson);
-  return { ...DEFAULT_NOTIFICATION_DELIVERY_PREFERENCES, ...(stored || {}) };
+  try {
+    const handles = await getDeliverySession(profileId);
+    if (!handles) return DEFAULT_NOTIFICATION_DELIVERY_PREFERENCES;
+    const page = await handles.session.messages({ size: 80, reverse: true });
+    const message = page.items.find((item) => item.metadata?.elpNotificationDeliveryPreferences === true);
+    const stored = parseJson<Partial<NotificationDeliveryPreferences>>(message?.metadata?.preferencesJson);
+    return { ...DEFAULT_NOTIFICATION_DELIVERY_PREFERENCES, ...(stored || {}) };
+  } catch (error) {
+    console.error('Notification delivery preferences read failed', error);
+    return DEFAULT_NOTIFICATION_DELIVERY_PREFERENCES;
+  }
 }
 
 export async function setDeliveryPreferences(profileId: string, preferences: NotificationDeliveryPreferences) {
@@ -151,45 +156,55 @@ export async function removePushSubscription(profileId: string, endpoint: string
 }
 
 export async function listPushSubscriptions(profileId: string): Promise<PushSubscriptionRecord[]> {
-  const handles = await getDeliverySession(profileId);
-  if (!handles) return [];
-  const page = await handles.session.messages({ size: 160, reverse: true });
-  return page.items.flatMap((item) => {
-    if (item.metadata?.elpPushSubscription !== true || item.metadata?.active === false) return [];
-    const parsed = parseJson<{ endpoint: string; expirationTime?: number | null; keys: { p256dh: string; auth: string } }>(item.metadata.subscriptionJson);
-    if (!parsed?.endpoint || !parsed.keys?.p256dh || !parsed.keys?.auth) return [];
-    return [{
-      id: item.id,
-      endpoint: parsed.endpoint,
-      expirationTime: parsed.expirationTime,
-      keys: parsed.keys,
-      createdAt: typeof item.metadata.createdAt === 'string' ? item.metadata.createdAt : item.createdAt,
-      updatedAt: typeof item.metadata.updatedAt === 'string' ? item.metadata.updatedAt : item.createdAt,
-    }];
-  });
+  try {
+    const handles = await getDeliverySession(profileId);
+    if (!handles) return [];
+    const page = await handles.session.messages({ size: 160, reverse: true });
+    return page.items.flatMap((item) => {
+      if (item.metadata?.elpPushSubscription !== true || item.metadata?.active === false) return [];
+      const parsed = parseJson<{ endpoint: string; expirationTime?: number | null; keys: { p256dh: string; auth: string } }>(item.metadata.subscriptionJson);
+      if (!parsed?.endpoint || !parsed.keys?.p256dh || !parsed.keys?.auth) return [];
+      return [{
+        id: item.id,
+        endpoint: parsed.endpoint,
+        expirationTime: parsed.expirationTime,
+        keys: parsed.keys,
+        createdAt: typeof item.metadata.createdAt === 'string' ? item.metadata.createdAt : item.createdAt,
+        updatedAt: typeof item.metadata.updatedAt === 'string' ? item.metadata.updatedAt : item.createdAt,
+      }];
+    });
+  } catch (error) {
+    console.error('Push subscription read failed', error);
+    return [];
+  }
 }
 
 async function listDeliveryAttempts(profileId: string, limit = 300): Promise<DeliveryAttempt[]> {
-  const handles = await getDeliverySession(profileId);
-  if (!handles) return [];
-  const page = await handles.session.messages({ size: Math.min(300, Math.max(40, limit)), reverse: true });
-  return page.items.flatMap((item) => {
-    if (item.metadata?.elpNotificationDeliveryAttempt !== true) return [];
-    const channel = item.metadata.channel as NotificationChannel;
-    const status = item.metadata.deliveryStatus as DeliveryAttempt['status'];
-    const notificationId = typeof item.metadata.notificationId === 'string' ? item.metadata.notificationId : '';
-    const key = typeof item.metadata.deliveryKey === 'string' ? item.metadata.deliveryKey : '';
-    if (!notificationId || !key || !['push', 'email', 'sms', 'whatsapp', 'voice'].includes(channel) || !['sent', 'failed', 'skipped'].includes(status)) return [];
-    return [{
-      id: item.id,
-      notificationId,
-      deliveryKey: key,
-      channel,
-      status,
-      createdAt: typeof item.metadata.createdAt === 'string' ? item.metadata.createdAt : item.createdAt,
-      ...(typeof item.metadata.detail === 'string' ? { detail: item.metadata.detail } : {}),
-    }];
-  });
+  try {
+    const handles = await getDeliverySession(profileId);
+    if (!handles) return [];
+    const page = await handles.session.messages({ size: Math.min(300, Math.max(40, limit)), reverse: true });
+    return page.items.flatMap((item) => {
+      if (item.metadata?.elpNotificationDeliveryAttempt !== true) return [];
+      const channel = item.metadata.channel as NotificationChannel;
+      const status = item.metadata.deliveryStatus as DeliveryAttempt['status'];
+      const notificationId = typeof item.metadata.notificationId === 'string' ? item.metadata.notificationId : '';
+      const key = typeof item.metadata.deliveryKey === 'string' ? item.metadata.deliveryKey : '';
+      if (!notificationId || !key || !['push', 'email', 'sms', 'whatsapp', 'voice'].includes(channel) || !['sent', 'failed', 'skipped'].includes(status)) return [];
+      return [{
+        id: item.id,
+        notificationId,
+        deliveryKey: key,
+        channel,
+        status,
+        createdAt: typeof item.metadata.createdAt === 'string' ? item.metadata.createdAt : item.createdAt,
+        ...(typeof item.metadata.detail === 'string' ? { detail: item.metadata.detail } : {}),
+      }];
+    });
+  } catch (error) {
+    console.error('Notification delivery attempt read failed', error);
+    return [];
+  }
 }
 
 async function recordAttempt(profileId: string, notification: NotificationRecord, channel: NotificationChannel, status: DeliveryAttempt['status'], detail?: string) {
