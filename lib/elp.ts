@@ -1,3 +1,4 @@
+import { anticipatorySnapshotToPrompt, getAnticipatorySnapshot } from '@/lib/anticipatory-chief-of-staff';
 import { EXECUTIVE_DOCTRINE } from '@/lib/executive-doctrine';
 import {
   executiveLedgerToPrompt,
@@ -36,12 +37,13 @@ Operating style:
 - Speak naturally, calmly, precisely, and with quiet confidence.
 - Voice is the primary interface. Keep normal spoken turns concise; expand only when useful or requested.
 - Learn stable preferences, goals, projects, obligations, decision patterns, and communication style from approved memory.
-- Help think, plan, research, audit, remember, compare, prioritize, coordinate, and prepare actions.
+- Help think, plan, research, audit, remember, compare, prioritise, coordinate, and prepare actions.
 - Proactively surface material risks, conflicts, forgotten dependencies, opportunities, relationship drift, and next actions.
+- Use anticipatory forecasts as early-warning evidence, not certainty. Explain the observed evidence and confidence when a forecast affects a recommendation.
 - Distinguish verified facts from inference. Say when something is uncertain.
 - Use available tools when they materially improve the answer.
 - Prefer a direct authenticated API/tool over browser automation. Use browser/computer control only as a fallback.
-- For local requests, use authorized device coordinates when available instead of guessing the user's location.
+- For local requests, use authorised device coordinates when available instead of guessing the user's location.
 - Never claim an external action completed unless a tool result confirms it.
 - For consequential, destructive, financial, legal, security-sensitive, privacy-sensitive, or irreversible actions, require explicit approval before execution.
 - Prefer reversible actions and least privilege.
@@ -100,7 +102,7 @@ export function getReasoningProvider(): ReasoningProvider | null {
 }
 
 export async function buildElpSystemPrompt(profileId: string, sessionId: string) {
-  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes] = await Promise.all([
+  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes, anticipatory] = await Promise.all([
     getMemorySnapshot(profileId, sessionId),
     getExecutiveMemorySnapshot(profileId),
     getExecutiveLedger(profileId),
@@ -108,6 +110,7 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
     getRelationshipSnapshot(profileId),
     getNotificationCenter(profileId),
     getMeetingOutcomeSnapshot(profileId),
+    getAnticipatorySnapshot(profileId),
   ]);
   const memoryText = memoryToPrompt(memory);
   const executiveText = executiveMemoryToPrompt(executiveMemory);
@@ -116,11 +119,13 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
   const relationshipText = relationshipSnapshotToPrompt(relationships);
   const notificationText = notificationCenterToPrompt(notifications);
   const outcomeText = meetingOutcomeSnapshotToPrompt(meetingOutcomes);
+  const anticipatoryText = anticipatorySnapshotToPrompt(anticipatory);
   const sections = [
     ELP_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
     lifeOperatorPrompt(),
     `AVAILABLE ELP SKILLS:\n${skillsToPrompt()}`,
+    anticipatoryText ? `ANTICIPATORY CHIEF OF STAFF:\n${anticipatoryText}` : '',
     notificationText ? `PRIORITY NOTIFICATIONS:\n${notificationText}` : '',
     taskText ? `LIVE COMMAND CENTER:\n${taskText}` : '',
     relationshipText ? `LIVE RELATIONSHIP INTELLIGENCE:\n${relationshipText}` : '',
