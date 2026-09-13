@@ -7,6 +7,8 @@ import {
   getExecutiveLedger,
   getExecutiveMemorySnapshot,
 } from '@/lib/executive-memory';
+import { executionScheduleToPrompt, getLatestExecutionSchedule } from '@/lib/execution-schedule-memory';
+import { getLatestInterruptSnapshot, interruptSnapshotToPrompt } from '@/lib/interrupt-memory';
 import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
 import { lifeOperatorPrompt } from '@/lib/life-operator';
 import { getNotificationCenter, notificationCenterToPrompt } from '@/lib/notification-store';
@@ -59,6 +61,8 @@ Cognitive governance:
 - Separate activity from outcomes. Completion of an action is not evidence that the objective succeeded.
 - Treat goal hierarchy as strategic context: execution should support an active objective or explicitly explain why it is unlinked.
 - Delegation is not completion. Treat stale check-ins, blockers, overdue work and missing evidence as exceptions until progress is verified.
+- Treat protected execution blocks as current execution intent. Do not casually interrupt deep work. Break focus only for material exceptions that cross the interrupt policy threshold.
+- If work is interrupted, preserve the resume checkpoint and return to it unless a higher-priority tradeoff remains active.
 
 Action planning:
 - Identify the smallest skill or combination of skills that can complete the request.
@@ -114,7 +118,7 @@ export function getReasoningProvider(): ReasoningProvider | null {
 }
 
 export async function buildElpSystemPrompt(profileId: string, sessionId: string) {
-  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes, cognitivePolicy, calibration, portfolio, dailyPlan] = await Promise.all([
+  const [memory, executiveMemory, executiveLedger, taskBoard, relationships, notifications, meetingOutcomes, cognitivePolicy, calibration, portfolio, dailyPlan, executionSchedule, interruptSnapshot] = await Promise.all([
     getMemorySnapshot(profileId, sessionId),
     getExecutiveMemorySnapshot(profileId),
     getExecutiveLedger(profileId),
@@ -126,6 +130,8 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
     getStoredStrategyCalibration(profileId),
     getPortfolioSnapshot(profileId),
     getLatestDailyOperatingPlan(profileId),
+    getLatestExecutionSchedule(profileId),
+    getLatestInterruptSnapshot(profileId),
   ]);
   const memoryText = memoryToPrompt(memory);
   const executiveText = executiveMemoryToPrompt(executiveMemory);
@@ -138,6 +144,8 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
   const calibrationText = strategyCalibrationToPrompt(calibration);
   const portfolioText = portfolioSnapshotToPrompt(portfolio);
   const dailyPlanText = dailyOperatingPlanToPrompt(dailyPlan);
+  const executionText = executionScheduleToPrompt(executionSchedule);
+  const interruptText = interruptSnapshotToPrompt(interruptSnapshot);
   const sections = [
     ELP_SYSTEM_PROMPT,
     EXECUTIVE_DOCTRINE,
@@ -145,6 +153,8 @@ export async function buildElpSystemPrompt(profileId: string, sessionId: string)
     calibrationText ? `DECISION CALIBRATION:\n${calibrationText}` : '',
     portfolioText ? `PORTFOLIO CONTROL:\n${portfolioText}` : '',
     dailyPlanText ? `DAILY OPERATING PLAN:\n${dailyPlanText}` : '',
+    executionText ? `ACTIVE EXECUTION SCHEDULE:\n${executionText}` : '',
+    interruptText ? `ADAPTIVE INTERRUPTION STATE:\n${interruptText}` : '',
     lifeOperatorPrompt(),
     `AVAILABLE ELP SKILLS:\n${skillsToPrompt()}`,
     notificationText ? `PRIORITY NOTIFICATIONS:\n${notificationText}` : '',
