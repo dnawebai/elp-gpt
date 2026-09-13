@@ -3,8 +3,8 @@ import { executeComposioTool } from '@/lib/composio';
 export type PhoneReadiness = {
   configured: boolean;
   available: boolean;
-  phoneNumbers: Array<{ number: string; inboundAgentId?: string; outboundAgentId?: string; raw?: Record<string, unknown> }>;
-  agents: Array<{ id: string; name?: string; raw?: Record<string, unknown> }>;
+  phoneNumbers: Array<{ number: string; inboundAgentId?: string; outboundAgentId?: string }>;
+  agents: Array<{ id: string; name?: string }>;
   error?: string;
 };
 
@@ -21,9 +21,9 @@ export async function getPhoneReadiness(profileId: string): Promise<PhoneReadine
       executeComposioTool({ toolSlug: 'RETELLAI_LIST_AGENTS', arguments: {}, profileId }),
     ]);
     const numberObjects = walkObjects(numbersRaw).filter((item) => typeof item.phone_number === 'string' || typeof item.phoneNumber === 'string');
-    const phoneNumbers = numberObjects.map((item) => ({ number: String(item.phone_number || item.phoneNumber), ...(typeof item.inbound_agent_id === 'string' ? { inboundAgentId: item.inbound_agent_id } : {}), ...(typeof item.outbound_agent_id === 'string' ? { outboundAgentId: item.outbound_agent_id } : {}), raw: item })).filter((item, index, list) => list.findIndex((other) => other.number === item.number) === index);
+    const phoneNumbers = numberObjects.map((item) => ({ number: String(item.phone_number || item.phoneNumber), ...(typeof item.inbound_agent_id === 'string' ? { inboundAgentId: item.inbound_agent_id } : {}), ...(typeof item.outbound_agent_id === 'string' ? { outboundAgentId: item.outbound_agent_id } : {}) })).filter((item, index, list) => list.findIndex((other) => other.number === item.number) === index);
     const agentObjects = walkObjects(agentsRaw).filter((item) => typeof item.agent_id === 'string' || typeof item.agentId === 'string');
-    const agents = agentObjects.map((item) => ({ id: String(item.agent_id || item.agentId), ...(typeof item.agent_name === 'string' ? { name: item.agent_name } : typeof item.name === 'string' ? { name: item.name } : {}), raw: item })).filter((item, index, list) => list.findIndex((other) => other.id === item.id) === index);
+    const agents = agentObjects.map((item) => ({ id: String(item.agent_id || item.agentId), ...(typeof item.agent_name === 'string' ? { name: item.agent_name } : typeof item.name === 'string' ? { name: item.name } : {}) })).filter((item, index, list) => list.findIndex((other) => other.id === item.id) === index);
     return { configured: true, available: phoneNumbers.length > 0 && agents.length > 0, phoneNumbers, agents };
   } catch (error) {
     return { configured: false, available: false, phoneNumbers: [], agents: [], error: error instanceof Error ? error.message.slice(0, 300) : 'Phone provider unavailable.' };
