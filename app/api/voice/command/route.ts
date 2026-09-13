@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getExecutiveLedger } from '@/lib/executive-memory';
+import { prepareVoiceMeetingCalendar, prepareVoiceMeetingEmail } from '@/lib/meeting-voice-actions';
 import { prepareNegotiationBrief } from '@/lib/relationship-intelligence';
 import { getRelationshipSnapshot } from '@/lib/relationship-memory';
 import { runOperatorMission } from '@/lib/operator';
@@ -22,7 +23,9 @@ type VoiceCommand =
   | 'negotiation'
   | 'ledger'
   | 'commitments'
-  | 'command_center';
+  | 'command_center'
+  | 'meeting_follow_up'
+  | 'meeting_schedule';
 
 function readProfile(request: Request) {
   const value = (request.headers.get('cookie') || '')
@@ -74,11 +77,15 @@ export async function POST(request: Request) {
     meeting?: unknown;
     timezone?: unknown;
     query?: unknown;
+    followUpNumber?: unknown;
+    scheduleRequest?: unknown;
+    durationMinutes?: unknown;
+    inviteParticipants?: unknown;
   } | null;
 
   const command = typeof body?.command === 'string' ? body.command as VoiceCommand : null;
   const allowed = new Set<VoiceCommand>([
-    'mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center',
+    'mission', 'attention', 'daily_briefing', 'meeting_prep', 'radar', 'relationships', 'relationship', 'negotiation', 'ledger', 'commitments', 'command_center', 'meeting_follow_up', 'meeting_schedule',
   ]);
   if (!command || !allowed.has(command)) return NextResponse.json({ error: 'Unsupported JARBIS voice command.' }, { status: 400 });
 
@@ -94,14 +101,28 @@ export async function POST(request: Request) {
     if (command === 'mission') {
       if (!objective) return NextResponse.json({ error: 'Mission objective is required.' }, { status: 400 });
       const result = await runOperatorMission({ objective, profileId: profile.profileId, sessionId, state: null });
-      return NextResponse.json({
-        ok: result.ok,
-        command,
-        status: result.status,
-        summary: result.summary,
-        question: result.question,
-        pendingAction: result.pendingAction,
-      }, { headers: { 'Cache-Control': 'no-store, private' } });
+      return NextResponse.json({ ok: result.ok, command, status: result.status, summary: result.summary, question: result.question, pendingAction: result.pendingAction }, { headers: { 'Cache-Control': 'no-store, private' } });
+    }
+
+    if (command === 'meeting_follow_up') {
+      const meetingReference = meeting || target || 'latest';
+      const followUpNumber = typeof body?.followUpNumber === 'number' && Number.isFinite(body.followUpNumber) ? Math.max(1, Math.round(body.followUpNumber)) : 1;
+      const pendingAction = await prepareVoiceMeetingEmail(profile.profileId, meetingReference, followUpNumber, timezone);
+      return NextResponse.json({ ok: true, command, status: 'approval_required', summary: pendingAction.summary, pendingAction }, { headers: { 'Cache-Control': 'no-store, private' } });
+    }
+
+    if (command === 'meeting_schedule') {
+      const meetingReference = meeting || target || 'latest';
+      const scheduleRequest = typeof body?.scheduleRequest === 'string' ? clip(body.scheduleRequest, 1200) : objective;
+      if (!scheduleRequest) return NextResponse.json({ error: 'A follow-up date/time is required.' }, { status: 400 });
+      const pendingAction = await prepareVoiceMeetingCalendar(profile.profileId, {
+        meetingReference,
+        scheduleRequest,
+        timezone,
+        durationMinutes: typeof body?.durationMinutes === 'number' ? body.durationMinutes : undefined,
+        inviteParticipants: body?.inviteParticipants !== false,
+      });
+      return NextResponse.json({ ok: true, command, status: 'approval_required', summary: pendingAction.summary, pendingAction }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
     if (command === 'attention' || command === 'daily_briefing' || command === 'meeting_prep') {
@@ -113,28 +134,14 @@ export async function POST(request: Request) {
         meeting: meeting || undefined,
         persist: true,
       });
-      return NextResponse.json({
-        ok: briefing.ok,
-        command,
-        status: briefing.status,
-        summary: clip(briefing.summary, 7000),
-        question: briefing.question,
-      }, { headers: { 'Cache-Control': 'no-store, private' } });
+      return NextResponse.json({ ok: briefing.ok, command, status: briefing.status, summary: clip(briefing.summary, 7000), question: briefing.question }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
     if (command === 'radar') {
       const radar = await getRadarSnapshot(profile.profileId);
-      const signals = radar.signals
-        .filter((signal) => signal.status === 'open' || signal.status === 'acknowledged')
-        .slice(0, 10)
-        .map((signal) => ({
-          type: signal.type,
-          severity: signal.severity,
-          title: signal.title,
-          summary: signal.summary,
-          recommendedAction: signal.recommendedAction,
-          confidence: signal.confidence,
-        }));
+      const signals = radar.signals.filter((signal) => signal.status === 'open' || signal.status === 'acknowledged').slice(0, 10).map((signal) => ({
+        type: signal.type, severity: signal.severity, title: signal.title, summary: signal.summary, recommendedAction: signal.recommendedAction, confidence: signal.confidence,
+      }));
       return NextResponse.json({ ok: true, command, stats: radar.stats, signals, lastScan: radar.lastScan }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
@@ -146,31 +153,15 @@ export async function POST(request: Request) {
         records = records.filter((record) => [record.name, record.organization || '', record.email || ''].some((value) => value.toLowerCase().includes(needle)));
       }
       const relationships = records.slice(0, 10).map((record) => ({
-        id: record.id,
-        name: record.name,
-        organization: record.organization,
-        role: record.role,
-        strategicValue: record.strategicValue,
-        momentum: record.momentum,
-        lastInteractionAt: record.lastInteractionAt,
-        openLoops: record.openLoops.slice(0, 5),
-        promisesByUs: record.promisesByUs.slice(0, 4),
-        promisesByThem: record.promisesByThem.slice(0, 4),
-        objections: record.objections.slice(0, 4),
-        nextBestAction: record.nextBestAction,
-        confidence: record.confidence,
+        id: record.id, name: record.name, organization: record.organization, role: record.role, strategicValue: record.strategicValue, momentum: record.momentum, lastInteractionAt: record.lastInteractionAt,
+        openLoops: record.openLoops.slice(0, 5), promisesByUs: record.promisesByUs.slice(0, 4), promisesByThem: record.promisesByThem.slice(0, 4), objections: record.objections.slice(0, 4), nextBestAction: record.nextBestAction, confidence: record.confidence,
       }));
       return NextResponse.json({ ok: true, command, stats: snapshot.stats, relationships }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
     if (command === 'negotiation') {
       if (!target) return NextResponse.json({ error: 'Negotiation target is required.' }, { status: 400 });
-      const brief = await prepareNegotiationBrief({
-        profileId: profile.profileId,
-        target,
-        objective: objective || undefined,
-        context: context || undefined,
-      });
+      const brief = await prepareNegotiationBrief({ profileId: profile.profileId, target, objective: objective || undefined, context: context || undefined });
       return NextResponse.json({ ok: true, command, target: brief.target, summary: clip(brief.brief, 10000) }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
@@ -178,25 +169,15 @@ export async function POST(request: Request) {
       const result = await compactLedger()(profile.profileId);
       return NextResponse.json({ command, ...result }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
-
     if (command === 'commitments') {
       const result = await compactLedger('commitment')(profile.profileId);
       return NextResponse.json({ command, ...result }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
     const board = await getTaskBoard(profile.profileId);
-    return NextResponse.json({
-      ok: true,
-      command,
-      total: board.total,
-      queues: {
-        now: board.queues.now.slice(0, 8),
-        decisions: board.queues.decisions.slice(0, 8),
-        working: board.queues.working.slice(0, 8),
-        delegated: board.queues.delegated.slice(0, 8),
-        done: board.queues.done.slice(0, 5),
-      },
-    }, { headers: { 'Cache-Control': 'no-store, private' } });
+    return NextResponse.json({ ok: true, command, total: board.total, queues: {
+      now: board.queues.now.slice(0, 8), decisions: board.queues.decisions.slice(0, 8), working: board.queues.working.slice(0, 8), delegated: board.queues.delegated.slice(0, 8), done: board.queues.done.slice(0, 5),
+    } }, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) {
     console.error('Unified JARBIS voice command failed', { command, error });
     return NextResponse.json({ error: error instanceof Error ? error.message : 'JARBIS voice command failed.' }, { status: 500 });
