@@ -35,7 +35,14 @@ export async function listRecentInboundEvents(profileId: string, hours = 6, maxI
   const handles = await sessionFor(profileId); if (!handles) return [] as InboundEvent[];
   const boundedHours = Math.max(1, Math.min(72, hours)); const cutoff = Date.now() - boundedHours * 3_600_000;
   const messages = await listHonchoMessages(handles.session, { pageSize: 100, maxPages: 10, reverse: true });
-  return messages.map(parseInboundEvent).filter((item): item is InboundEvent => Boolean(item) && Date.parse(item.receivedAt) >= cutoff).sort((a,b) => b.receivedAt.localeCompare(a.receivedAt)).slice(0, Math.max(1, Math.min(500, maxItems)));
+  return messages
+    .map(parseInboundEvent)
+    .filter((item): item is InboundEvent => {
+      if (!item) return false;
+      return Date.parse(item.receivedAt) >= cutoff;
+    })
+    .sort((a,b) => b.receivedAt.localeCompare(a.receivedAt))
+    .slice(0, Math.max(1, Math.min(500, maxItems)));
 }
 
 export async function ensureBaselineEventStatus(profileId: string) {
