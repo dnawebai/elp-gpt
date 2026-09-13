@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, LoaderCircle, Mic, MicOff, Play, ShieldCheck, X } from 'lucide-react';
+import { ArrowLeft, Check, LayoutDashboard, LoaderCircle, Mic, MicOff, Play, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import './operator.css';
 
@@ -32,6 +32,7 @@ type OperatorResult = {
   objective: string;
   summary: string;
   state: OperatorMissionState;
+  taskId?: string;
   pendingAction?: PendingOperatorAction;
   question?: string;
   error?: string;
@@ -106,6 +107,7 @@ export default function OperatorPage() {
         body: JSON.stringify({
           objective: goal,
           sessionId,
+          taskId: mission?.taskId,
           state: args?.state || mission?.state || null,
           resumeObservation: args?.resumeObservation || null,
         }),
@@ -228,7 +230,7 @@ export default function OperatorPage() {
     <header className="operator-header">
       <Link href="/" className="operator-back"><ArrowLeft size={17} /> LUKE</Link>
       <div><span>ELP GPT</span><h1>JARBIS Operator</h1></div>
-      <div className="operator-live"><i /> EXECUTION LAYER</div>
+      <Link href="/command-center" className="operator-live"><LayoutDashboard size={14} /> COMMAND CENTER</Link>
     </header>
 
     <section className="operator-command">
@@ -270,6 +272,7 @@ export default function OperatorPage() {
         <span className="panel-kicker">MISSION STATUS</span>
         <h2>{mission ? mission.status.replaceAll('_', ' ').toUpperCase() : 'STANDBY'}</h2>
         <p>{mission?.summary || 'JARBIS Operator can autonomously research and read connected systems. External changes remain behind explicit approval.'}</p>
+        {mission?.taskId && <p><Link href="/command-center">Tracked in Command Center →</Link></p>}
       </article>
 
       <article className="operator-panel trace-panel">
