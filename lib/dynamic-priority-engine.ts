@@ -28,9 +28,9 @@ function rankItem(input: Omit<PriorityItem, 'score' | 'horizon'> & { base: numbe
   return { ...input, score: finalScore, horizon: horizonFrom(finalScore, due, input.blocked) } satisfies PriorityItem & { base: number; dueInDays?: number | null; strategic?: number; capacityPenalty?: number };
 }
 
-function stripInternal<T extends PriorityItem & Record<string, unknown>>(item: T): PriorityItem {
+function stripInternal(item: PriorityItem & { base?: number; dueInDays?: number | null; strategic?: number; capacityPenalty?: number }): PriorityItem {
   const { base: _base, dueInDays: _due, strategic: _strategic, capacityPenalty: _capacityPenalty, ...clean } = item;
-  return clean as PriorityItem;
+  return clean;
 }
 
 export async function runDynamicPriorityEngine(args: { profileId: string; persist?: boolean }) {
