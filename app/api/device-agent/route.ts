@@ -11,7 +11,8 @@ async function resolveAgent(request: Request, deviceId: string) {
   const companion = await verifyCompanionAccess(token);
   if (companion) {
     if (companion.device.id !== deviceId) return null;
-    await heartbeatCompanion(companion.profileId, companion.device.id).catch(() => undefined);
+    const lastSeen = companion.device.lastSeenAt ? Date.parse(companion.device.lastSeenAt) : 0;
+    if (!lastSeen || Date.now() - lastSeen >= 60_000) await heartbeatCompanion(companion.profileId, companion.device.id).catch(() => undefined);
     return { profileId: companion.profileId, allowedCommands: companion.device.allowedCommands, principalId: companion.principal.id, mode: 'companion' as const };
   }
   if (verifyDeviceAgentToken(token)) {
