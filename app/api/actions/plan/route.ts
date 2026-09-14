@@ -2,23 +2,16 @@ import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { actionDigest, approvalCopy, classifyActionRisk, normalizeToolSlug, sanitizeActionArguments } from '@/lib/actions';
 import { recordActionProposal } from '@/lib/approval-ledger';
+import { hasCapability, requiredApprovalCapability } from '@/lib/authority-policy';
 import { isComposioConfigured } from '@/lib/composio';
-import { createActionToken, PROFILE_COOKIE, sanitizeId, verifyProfileToken } from '@/lib/security';
+import { createActionToken, sanitizeId } from '@/lib/security';
+import { resolveZeroTrustAuthority } from '@/lib/zero-trust-authority';
 
 export const runtime = 'nodejs';
 
-function profileFrom(request: Request) {
-  const token = (request.headers.get('cookie') || '')
-    .split(';')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${PROFILE_COOKIE}=`))
-    ?.slice(PROFILE_COOKIE.length + 1);
-  return verifyProfileToken(token);
-}
-
 export async function POST(request: Request) {
-  const profile = profileFrom(request);
-  if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
+  const context = await resolveZeroTrustAuthority(request);
+  if (!context) return NextResponse.json({ error: 'Identity not established or delegated session revoked.' }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as {
     sessionId?: unknown;
@@ -37,24 +30,33 @@ export async function POST(request: Request) {
   const connectedAccountId = typeof body.connectedAccountId === 'string' ? body.connectedAccountId.trim().slice(0, 160) : undefined;
   const summary = typeof body.summary === 'string' ? body.summary.trim().slice(0, 500) : toolSlug.replaceAll('_', ' ').toLowerCase();
   const risk = classifyActionRisk(toolSlug);
+  if (risk === 'read' && !hasCapability(context.principal.role, 'read_context', context.principal.capabilities)) {
+    return NextResponse.json({ error: 'Principal is not authorized to read connected context.' }, { status: 403 });
+  }
+  const approvalCapability = requiredApprovalCapability(risk);
+  if (approvalCapability && !hasCapability(context.principal.role, approvalCapability, context.principal.capabilities)) {
+    return NextResponse.json({ error: `Principal is not authorized to plan ${risk}-risk connected actions.` }, { status: 403 });
+  }
+
   const digest = actionDigest({ toolSlug, arguments: argumentsValue, connectedAccountId });
   const nonce = randomUUID();
   const ttlSeconds = 300;
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
   const proposalToken = createActionToken({
     stage: 'proposal',
-    profileId: profile.profileId,
+    profileId: context.profileId,
     sessionId,
     digest,
     risk,
     nonce,
+    principalId: context.principal.id,
     ttlSeconds,
   });
 
   try {
-    await recordActionProposal(profile.profileId, { nonce, digest, sessionId, toolSlug, summary, risk, expiresAt });
+    await recordActionProposal(context.profileId, { nonce, digest, sessionId, toolSlug, summary, risk, expiresAt });
   } catch (error) {
-    console.error('JARBIS approval proposal audit failed', error);
+    console.error('ELP approval proposal audit failed', error);
   }
 
   return NextResponse.json({
@@ -63,6 +65,7 @@ export async function POST(request: Request) {
     risk,
     requiresApproval: risk !== 'read',
     policy: approvalCopy(risk),
+    proposedByPrincipalId: context.principal.id,
     proposalToken,
     expiresInSeconds: ttlSeconds,
   }, { headers: { 'Cache-Control': 'no-store, private' } });
