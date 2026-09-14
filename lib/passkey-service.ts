@@ -145,7 +145,19 @@ export async function verifyPasskeyAuthentication(request: Request, context: Zer
   await updatePasskeyUsage(context.profileId, context.principal.id, passkey.id, verification.authenticationInfo.newCounter);
 
   if (!context.delegated || !context.session) {
-    return { verified: true, purpose: challenge.purpose, stepUpToken: null, ownerSession: true };
+    return {
+      verified: true,
+      purpose: challenge.purpose,
+      stepUpToken: createPrincipalStepUpToken({
+        profileId: context.profileId,
+        principalId: context.principal.id,
+        sessionId: 'owner',
+        tokenVersion: 'owner',
+        purpose: challenge.purpose,
+        ttlSeconds: 300,
+      }),
+      ownerSession: true,
+    };
   }
   const live = await validatePrincipalSession({
     profileId: context.profileId,
