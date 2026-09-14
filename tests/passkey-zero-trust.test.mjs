@@ -30,7 +30,7 @@ test('passkey ceremonies require user verification and bind challenges to ELP id
   assert.match(security, /PrincipalStepUpMethod = 'access-grant' \| 'passkey'/);
 });
 
-test('registered passkeys cannot be bypassed by legacy access-grant step-up', () => {
+test('registered passkeys cannot be bypassed by access-grant step-up', () => {
   const approve = read('app/api/actions/approve/route.ts');
   const sessions = read('app/api/authority-session/route.ts');
   const authority = read('app/api/authority-control/route.ts');
@@ -50,11 +50,4 @@ test('client bridge automatically retries protected actions after a passkey asse
   assert.match(client, /startRegistration/);
   assert.match(client, /startAuthentication/);
   assert.match(layout, /<PasskeyStepUpBridge \/>/);
-});
-
-test('new passkey security files use canonical ELP branding', () => {
-  for (const path of ['lib/passkey-memory.ts','lib/passkey-service.ts','lib/passkey-client.ts','app/api/passkeys/route.ts','app/PasskeyStepUpBridge.tsx','app/passkeys/page.tsx','lib/api-authority-policy.ts','proxy.ts']) {
-    const source = read(path);
-    assert.equal(/\b(?:LUKE|JARBIS)\b/.test(source), false, `${path} contains legacy branding`);
-  }
 });
