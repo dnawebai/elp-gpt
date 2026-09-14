@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentMicrophone, AgentPlayer, AgentSession } from '@deepgram/agents';
 import type { ElpDeviceContext } from '@/lib/device-context';
+import { elpTimeGreeting } from '@/lib/time-greeting';
 
 type VoiceMessage = { role: 'user' | 'assistant'; content: string };
 export type ElpVoiceCommand = { name: string; input: Record<string, unknown> };
@@ -52,6 +53,7 @@ const VOICE_PROMPT = `You are ELP, the voice-first intelligence system for ELP G
 Relationship and voice manner:
 - Address the primary user as "Sir" by default.
 - Use "Sir" naturally in greetings, acknowledgements, confirmations, and completed actions, but not at the end of every sentence.
+- Match time-of-day greetings to the user's browser-local time; never say good morning in the afternoon or evening.
 - Speak in polished contemporary British English with British spelling and understated British phrasing.
 - Sound like an exceptional British private secretary and executive concierge: discreet, composed, anticipatory, capable, precise, and quietly confident.
 - Correct the user tactfully when necessary and flag material risks clearly.
@@ -193,7 +195,7 @@ export function useElpVoice({ enabled, sessionId, onMessage, onCommand, onError 
       const session = new AgentSession({
         auth: { tokenFactory: async () => { const response = await fetch('/api/deepgram-token', { method: 'POST', cache: 'no-store' }); if (!response.ok) throw new Error(await response.text()); return response.text(); } },
         ...(voiceConfig.agentUrl ? { url: voiceConfig.agentUrl } : {}),
-        agent: { listen: { provider: listenProvider }, think, speak: { provider: { type: 'deepgram', version: voiceConfig.speakVersion, model: voiceConfig.voiceModel, speed: voiceConfig.voiceSpeed } }, greeting: 'Good day, Sir. ELP is online.' } as any,
+        agent: { listen: { provider: listenProvider }, think, speak: { provider: { type: 'deepgram', version: voiceConfig.speakVersion, model: voiceConfig.voiceModel, speed: voiceConfig.voiceSpeed } }, greeting: elpTimeGreeting() } as any,
         audio: { input: { encoding: 'linear16', sampleRate: 16_000 }, output: { encoding: 'linear16', sampleRate: 24_000 } },
         reconnect: { enabled: true, maxAttempts: 8, baseDelay: 500, maxDelay: 15_000, jitter: true },
       });
