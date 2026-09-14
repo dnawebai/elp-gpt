@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   if (!(await requireAuthorityStepUp(context, body))) {
     const hasPasskey = (await listActivePasskeys(context.profileId, context.principal.id)).length > 0;
     await recordSecurityEventSafe(context.profileId, {
-      category: 'authority', action: 'authority.change_denied', outcome: 'denied', severity: 'high',
+      category: 'authority', action: 'authority.step_up_required', outcome: 'info', severity: 'normal',
       actorPrincipalId: context.principal.id, sessionId: context.session?.id,
       detail: action || 'unknown authority change', clientFingerprint: fingerprint,
     });
