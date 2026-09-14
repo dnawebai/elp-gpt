@@ -1,24 +1,21 @@
 {
   "name": "elp-desktop-companion",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "ELP zero-trust desktop companion",
   "main": "main.cjs",
-  "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder --publish never"
-  },
-  "devDependencies": {
-    "electron": "^37.3.1",
-    "electron-builder": "^26.0.12"
-  },
+  "scripts": { "start": "electron .", "dist": "electron-builder --publish never", "release": "electron-builder --publish always" },
+  "dependencies": { "electron-updater": "^6.6.2" },
+  "devDependencies": { "electron": "^37.3.1", "electron-builder": "^26.0.12" },
   "build": {
     "appId": "ai.elpgpt.companion",
     "productName": "ELP Companion",
     "asar": true,
-    "files": ["main.cjs", "agent.cjs", "preload.cjs", "renderer.html", "renderer.js"],
-    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.productivity" },
+    "files": ["main.cjs", "agent.cjs", "wake-word.cjs", "preload.cjs", "renderer.html", "renderer.js", "entitlements.mac.plist"],
+    "publish": [{ "provider": "github", "owner": "dnawebai", "repo": "elp-gpt", "releaseType": "release" }],
+    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.productivity", "hardenedRuntime": true, "gatekeeperAssess": false, "entitlements": "entitlements.mac.plist", "entitlementsInherit": "entitlements.mac.plist" },
     "win": { "target": ["nsis", "portable"] },
-    "linux": { "target": ["AppImage"] }
+    "linux": { "target": ["AppImage"], "category": "Utility" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true }
   }
 }
