@@ -52,6 +52,7 @@ export type SecurityOperationsSnapshot = {
   activeSessions: Array<{
     id: string;
     principalId: string;
+    principalDisplayName?: string;
     assurance: string;
     createdAt: string;
     expiresAt: string;
@@ -128,7 +129,14 @@ async function upsertIncident(profileId: string, finding: SecurityFinding) {
   const existing = incidents.find((item) => item.detectionKey === finding.key && item.status !== 'resolved');
   const now = new Date().toISOString();
   if (existing) {
-    const next: SecurityIncident = {
+    const changed = existing.severity !== finding.severity
+      || existing.title !== finding.title
+      || existing.summary !== finding.summary
+      || existing.recommendedAction !== finding.recommendedAction
+      || existing.subjectId !== finding.subjectId
+      || existing.status !== 'open';
+    if (!changed) return existing;
+    return writeIncident(profileId, {
       ...existing,
       severity: finding.severity,
       title: finding.title,
@@ -137,9 +145,7 @@ async function upsertIncident(profileId: string, finding: SecurityFinding) {
       ...(finding.subjectId ? { subjectId: finding.subjectId } : {}),
       status: 'open',
       updatedAt: now,
-    };
-    if (JSON.stringify(next) !== JSON.stringify(existing)) await writeIncident(profileId, next);
-    return next;
+    });
   }
   const incident: SecurityIncident = {
     id: randomUUID(),
@@ -155,12 +161,8 @@ async function upsertIncident(profileId: string, finding: SecurityFinding) {
   };
   await writeIncident(profileId, incident);
   await recordSecurityEventSafe(profileId, {
-    category: 'incident',
-    action: 'incident.opened',
-    outcome: 'info',
-    severity: finding.severity,
-    subjectId: incident.id,
-    detail: finding.title,
+    category: 'incident', action: 'incident.opened', outcome: 'info', severity: finding.severity,
+    subjectId: incident.id, detail: finding.title,
   });
   return incident;
 }
@@ -174,13 +176,8 @@ export async function resolveSecurityIncident(profileId: string, incidentId: str
   const next: SecurityIncident = { ...incident, status: 'resolved', resolvedAt: now, resolvedByPrincipalId: actorPrincipalId, updatedAt: now };
   await writeIncident(profileId, next);
   await recordSecurityEventSafe(profileId, {
-    category: 'incident',
-    action: 'incident.resolved',
-    outcome: 'success',
-    severity: 'normal',
-    actorPrincipalId,
-    subjectId: incident.id,
-    detail: incident.title,
+    category: 'incident', action: 'incident.resolved', outcome: 'success', severity: 'normal',
+    actorPrincipalId, subjectId: incident.id, detail: incident.title,
   });
   return next;
 }
@@ -194,7 +191,7 @@ function eventCount(events: SecurityAuditEvent[], predicate: (event: SecurityAud
 }
 
 function notificationFingerprint(incident: SecurityIncident) {
-  return createHash('sha256').update(`security|${incident.id}|${incident.updatedAt}`).digest('hex').slice(0, 24);
+  return createHash('sha256').update(`security|${incident.id}`).digest('hex').slice(0, 24);
 }
 
 async function publishIncidentNotifications(profileId: string, incidents: SecurityIncident[]) {
@@ -212,13 +209,13 @@ async function publishIncidentNotifications(profileId: string, incidents: Securi
     }));
   if (!candidates.length) return;
   try {
-    await upsertNotificationCandidates(profileId, candidates);
+    await upsertNotificationCandidates(profileId, candidates, { resolveMissing: false });
   } catch (error) {
     console.error('ELP security notification write failed', error);
   }
 }
 
-export async function assessSecurityOperations(profileId: string, options?: { persistIncidents?: boolean; notify?: boolean }) : Promise<SecurityOperationsSnapshot> {
+export async function assessSecurityOperations(profileId: string, options?: { persistIncidents?: boolean; notify?: boolean }): Promise<SecurityOperationsSnapshot> {
   const configured = Boolean(process.env.HONCHO_API_KEY);
   const [events, sessions, principals, devices, incidents] = await Promise.all([
     listSecurityAuditEvents(profileId, 800),
@@ -237,9 +234,7 @@ export async function assessSecurityOperations(profileId: string, options?: { pe
 
   if (!integrity.ok) {
     findings.push(finding(
-      'audit-integrity',
-      'critical',
-      'Security audit integrity failure',
+      'audit-integrity', 'critical', 'Security audit integrity failure',
       integrity.reason || 'The security event chain could not be verified.',
       'Treat the audit trail as potentially incomplete, preserve current evidence, and review recent authority changes before continuing sensitive operations.',
       integrity.brokenAtEventId,
@@ -249,9 +244,7 @@ export async function assessSecurityOperations(profileId: string, options?: { pe
   const passkeyFailures15 = eventCount(last15, (event) => event.category === 'passkey' && (event.outcome === 'denied' || event.outcome === 'failure'));
   if (passkeyFailures15 >= 5) {
     findings.push(finding(
-      'passkey-failure-burst',
-      passkeyFailures15 >= 10 ? 'critical' : 'high',
-      'Repeated passkey verification failures',
+      'passkey-failure-burst', passkeyFailures15 >= 10 ? 'critical' : 'high', 'Repeated passkey verification failures',
       `${passkeyFailures15} passkey verification failures or denials were recorded during the last 15 minutes.`,
       'Review the affected principal and active sessions. Revoke delegated sessions if the attempts are not expected.',
     ));
@@ -260,9 +253,7 @@ export async function assessSecurityOperations(profileId: string, options?: { pe
   const denied15 = eventCount(last15, (event) => event.outcome === 'denied');
   if (denied15 >= 8) {
     findings.push(finding(
-      'security-denial-burst',
-      denied15 >= 16 ? 'critical' : 'high',
-      'Burst of denied security operations',
+      'security-denial-burst', denied15 >= 16 ? 'critical' : 'high', 'Burst of denied security operations',
       `${denied15} denied security operations were recorded during the last 15 minutes.`,
       'Inspect the recent security ledger for the affected principal or session and revoke suspicious sessions.',
     ));
@@ -272,22 +263,16 @@ export async function assessSecurityOperations(profileId: string, options?: { pe
     const principalSessions = activeSessions.filter((item) => item.principalId === principal.id);
     if (principal.status === 'revoked' && principalSessions.length) {
       findings.push(finding(
-        `revoked-principal-session:${principal.id}`,
-        'critical',
-        'Revoked principal still has active sessions',
+        `revoked-principal-session:${principal.id}`, 'critical', 'Revoked principal still has active sessions',
         `${principal.displayName} is revoked but ${principalSessions.length} active delegated session${principalSessions.length === 1 ? '' : 's'} remain registered.`,
-        'Revoke all sessions for this principal immediately and review recent activity.',
-        principal.id,
+        'Revoke all sessions for this principal immediately and review recent activity.', principal.id,
       ));
     }
     if (principal.status === 'active' && principalSessions.length >= 8) {
       findings.push(finding(
-        `session-sprawl:${principal.id}`,
-        principalSessions.length >= 12 ? 'critical' : 'high',
-        'Unusually high delegated-session count',
+        `session-sprawl:${principal.id}`, principalSessions.length >= 12 ? 'critical' : 'high', 'Unusually high delegated-session count',
         `${principal.displayName} currently has ${principalSessions.length} active delegated sessions.`,
-        'Confirm the active devices and revoke sessions that are no longer expected.',
-        principal.id,
+        'Confirm the active devices and revoke sessions that are no longer expected.', principal.id,
       ));
     }
   }
@@ -295,9 +280,7 @@ export async function assessSecurityOperations(profileId: string, options?: { pe
   const criticalActionFailures = eventCount(last60, (event) => event.category === 'action' && event.severity === 'critical' && event.outcome === 'failure');
   if (criticalActionFailures >= 3) {
     findings.push(finding(
-      'critical-action-failures',
-      'high',
-      'Repeated critical action failures',
+      'critical-action-failures', 'high', 'Repeated critical action failures',
       `${criticalActionFailures} critical action failures were recorded during the last hour.`,
       'Review the failed actions before issuing new high-risk approvals.',
     ));
@@ -314,6 +297,7 @@ export async function assessSecurityOperations(profileId: string, options?: { pe
   const critical = findings.some((item) => item.severity === 'critical') || openIncidents.some((item) => item.severity === 'critical');
   const elevated = findings.length > 0 || openIncidents.length > 0;
   const posture: SecurityPosture = critical ? 'critical' : elevated ? 'elevated' : 'normal';
+  const names = new Map(principals.map((item) => [item.id, item.displayName]));
 
   return {
     generatedAt: new Date().toISOString(),
@@ -326,6 +310,7 @@ export async function assessSecurityOperations(profileId: string, options?: { pe
     activeSessions: activeSessions.slice(0, 200).map((item) => ({
       id: item.id,
       principalId: item.principalId,
+      principalDisplayName: names.get(item.principalId),
       assurance: item.assurance,
       createdAt: item.createdAt,
       expiresAt: item.expiresAt,
@@ -346,13 +331,8 @@ export async function assessSecurityOperations(profileId: string, options?: { pe
 export async function revokeOneSecuritySession(profileId: string, sessionId: string, actorPrincipalId: string) {
   const revoked = await revokePrincipalSession(profileId, sessionId, actorPrincipalId);
   await recordSecurityEventSafe(profileId, {
-    category: 'session',
-    action: 'session.revoked_by_security',
-    outcome: 'success',
-    severity: 'high',
-    actorPrincipalId,
-    subjectId: revoked.principalId,
-    sessionId: revoked.id,
+    category: 'session', action: 'session.revoked_by_security', outcome: 'success', severity: 'high',
+    actorPrincipalId, subjectId: revoked.principalId, sessionId: revoked.id,
   });
   return revoked;
 }
@@ -360,12 +340,8 @@ export async function revokeOneSecuritySession(profileId: string, sessionId: str
 export async function revokePrincipalSecuritySessions(profileId: string, principalId: string, actorPrincipalId: string) {
   const revoked = await revokeAllPrincipalSessions(profileId, principalId, actorPrincipalId);
   await recordSecurityEventSafe(profileId, {
-    category: 'session',
-    action: 'principal.sessions_revoked_by_security',
-    outcome: 'success',
-    severity: 'high',
-    actorPrincipalId,
-    subjectId: principalId,
+    category: 'session', action: 'principal.sessions_revoked_by_security', outcome: 'success', severity: 'high',
+    actorPrincipalId, subjectId: principalId,
     detail: `${revoked.length} session${revoked.length === 1 ? '' : 's'} revoked.`,
   });
   return revoked;
@@ -375,7 +351,7 @@ export async function emergencySecurityLockdown(profileId: string, actorPrincipa
   const sessions = (await listPrincipalSessions(profileId, 1000)).filter((item) => item.status === 'active');
   const revokedSessions = [];
   for (const session of sessions) {
-    try { revokedSessions.push(await revokePrincipalSession(profileId, session.id, actorPrincipalId)); } catch { /* best effort across independent sessions */ }
+    try { revokedSessions.push(await revokePrincipalSession(profileId, session.id, actorPrincipalId)); } catch { /* continue across independent sessions */ }
   }
   const revokedDevices = [];
   if (includeDevices) {
@@ -384,25 +360,20 @@ export async function emergencySecurityLockdown(profileId: string, actorPrincipa
       try {
         const revoked = await revokeCompanionDevice(profileId, actorPrincipalId, device.id);
         if (revoked) revokedDevices.push(revoked);
-      } catch { /* best effort across independent devices */ }
+      } catch { /* continue across independent devices */ }
     }
   }
   await recordSecurityEventSafe(profileId, {
-    category: 'incident',
-    action: 'security.lockdown',
-    outcome: 'success',
-    severity: 'critical',
-    actorPrincipalId,
+    category: 'incident', action: 'security.lockdown', outcome: 'success', severity: 'critical', actorPrincipalId,
     detail: `${revokedSessions.length} delegated sessions revoked${includeDevices ? ` and ${revokedDevices.length} companion devices revoked` : ''}.`,
   });
-  const manualFinding = finding(
+  const incident = await upsertIncident(profileId, finding(
     `manual-lockdown:${new Date().toISOString().slice(0, 13)}`,
     'critical',
     'Emergency security lockdown activated',
     `${revokedSessions.length} delegated sessions were revoked${includeDevices ? ` and ${revokedDevices.length} companion devices were disabled` : ''}.`,
     'Review the security ledger, active principals, and passkeys before reissuing delegated access.',
-  );
-  const incident = await upsertIncident(profileId, manualFinding);
+  ));
   await publishIncidentNotifications(profileId, [incident]);
   return { revokedSessions: revokedSessions.length, revokedDevices: revokedDevices.length, incident };
 }
