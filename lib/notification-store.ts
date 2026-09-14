@@ -208,7 +208,8 @@ export async function upsertNotificationCandidates(profileId: string, candidates
     newCount += 1;
   }
 
-  if (options?.resolveMissing !== false) {
+  const resolveMissing = options?.resolveMissing ?? !candidates.every((candidate) => candidate.source === 'security-operations');
+  if (resolveMissing) {
     for (const item of existing) {
       if (!activeFingerprints.has(item.record.fingerprint) && (item.record.status === 'unread' || item.record.status === 'read')) {
         await handles.session.updateMessage(item.message.id, {
