@@ -143,7 +143,7 @@ export async function getNotificationCenter(profileId: string): Promise<Notifica
   }
 }
 
-export async function upsertNotificationCandidates(profileId: string, candidates: NotificationCandidate[]) {
+export async function upsertNotificationCandidates(profileId: string, candidates: NotificationCandidate[], options?: { resolveMissing?: boolean }) {
   if (!process.env.HONCHO_API_KEY) return { ok: false, newCount: 0, updatedCount: 0, resolvedCount: 0, center: emptyCenter(false) };
   const handles = await getNotificationSession(profileId);
   if (!handles) return { ok: false, newCount: 0, updatedCount: 0, resolvedCount: 0, center: emptyCenter(false) };
@@ -208,15 +208,17 @@ export async function upsertNotificationCandidates(profileId: string, candidates
     newCount += 1;
   }
 
-  for (const item of existing) {
-    if (!activeFingerprints.has(item.record.fingerprint) && (item.record.status === 'unread' || item.record.status === 'read')) {
-      await handles.session.updateMessage(item.message.id, {
-        ...item.message.metadata,
-        jarbisNotification: true,
-        status: 'resolved',
-        updatedAt: now,
-      });
-      resolvedCount += 1;
+  if (options?.resolveMissing !== false) {
+    for (const item of existing) {
+      if (!activeFingerprints.has(item.record.fingerprint) && (item.record.status === 'unread' || item.record.status === 'read')) {
+        await handles.session.updateMessage(item.message.id, {
+          ...item.message.metadata,
+          jarbisNotification: true,
+          status: 'resolved',
+          updatedAt: now,
+        });
+        resolvedCount += 1;
+      }
     }
   }
 
