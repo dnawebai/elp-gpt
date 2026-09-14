@@ -163,21 +163,65 @@ export async function recordSecurityEventSafe(profileId: string, input: Paramete
 
 export function verifySecurityAuditChain(events: SecurityAuditEvent[]): SecurityAuditIntegrity {
   if (!events.length) return { ok: true, checked: 0, anchored: false };
-  const ordered = [...events].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-  const first = ordered[0];
-  const anchored = first.prevHash === GENESIS_HASH;
-  for (let index = 0; index < ordered.length; index += 1) {
-    const event = ordered[index];
+
+  const byHash = new Map<string, SecurityAuditEvent>();
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index];
     const { hash, ...base } = event;
     const expectedHash = hashPayload(base);
     if (hash !== expectedHash) {
-      return { ok: false, checked: index + 1, anchored, brokenAtEventId: event.id, reason: 'Event content hash does not match the signed chain payload.', headHash: ordered.at(-1)?.hash };
+      return { ok: false, checked: index + 1, anchored: false, brokenAtEventId: event.id, reason: 'Event content hash does not match the immutable audit payload.' };
     }
-    if (index > 0 && event.prevHash !== ordered[index - 1].hash) {
-      return { ok: false, checked: index + 1, anchored, brokenAtEventId: event.id, reason: 'Audit chain continuity is broken or forked.', headHash: ordered.at(-1)?.hash };
+    if (byHash.has(hash)) {
+      return { ok: false, checked: index + 1, anchored: false, brokenAtEventId: event.id, reason: 'Duplicate event hash detected in the security audit ledger.' };
     }
+    byHash.set(hash, event);
   }
-  return { ok: true, checked: ordered.length, anchored, headHash: ordered.at(-1)?.hash };
+
+  const referenced = new Set(events.map((event) => event.prevHash).filter((hash) => byHash.has(hash)));
+  const heads = events.filter((event) => !referenced.has(event.hash));
+  if (heads.length !== 1) {
+    return {
+      ok: false,
+      checked: events.length,
+      anchored: false,
+      brokenAtEventId: heads[0]?.id,
+      reason: heads.length ? 'Audit ledger contains multiple chain heads, indicating a fork or disconnected segment.' : 'Audit ledger has no valid chain head.',
+    };
+  }
+
+  const roots = events.filter((event) => event.prevHash === GENESIS_HASH || !byHash.has(event.prevHash));
+  if (roots.length !== 1) {
+    return {
+      ok: false,
+      checked: events.length,
+      anchored: false,
+      brokenAtEventId: roots[0]?.id,
+      reason: 'Audit ledger contains multiple roots or disconnected segments.',
+      headHash: heads[0].hash,
+    };
+  }
+
+  const seen = new Set<string>();
+  let current: SecurityAuditEvent | undefined = heads[0];
+  let terminalPrevHash = '';
+  while (current) {
+    if (seen.has(current.hash)) {
+      return { ok: false, checked: seen.size, anchored: false, brokenAtEventId: current.id, reason: 'Cycle detected in the security audit chain.', headHash: heads[0].hash };
+    }
+    seen.add(current.hash);
+    terminalPrevHash = current.prevHash;
+    if (current.prevHash === GENESIS_HASH) break;
+    current = byHash.get(current.prevHash);
+    if (!current) break;
+  }
+
+  if (seen.size !== events.length) {
+    const missing = events.find((event) => !seen.has(event.hash));
+    return { ok: false, checked: seen.size, anchored: terminalPrevHash === GENESIS_HASH, brokenAtEventId: missing?.id, reason: 'Audit ledger contains an unreachable event or forked branch.', headHash: heads[0].hash };
+  }
+
+  return { ok: true, checked: events.length, anchored: terminalPrevHash === GENESIS_HASH, headHash: heads[0].hash };
 }
 
 export function recentSecurityEvents(events: SecurityAuditEvent[], minutes: number) {
