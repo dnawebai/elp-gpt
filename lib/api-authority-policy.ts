@@ -19,7 +19,7 @@ export function requiredApiCapability(pathname: string, method: string): Authori
   const verb = method.toUpperCase();
   if (verb === 'GET' || verb === 'HEAD' || verb === 'OPTIONS') return 'read_context';
 
-  if (pathname.startsWith('/api/authority-control')) return 'manage_authority';
+  if (pathname.startsWith('/api/authority-control') || pathname.startsWith('/api/security-operations')) return 'manage_authority';
   if (pathname.startsWith('/api/connections') || pathname.startsWith('/api/integration-health') || pathname.startsWith('/api/event-subscriptions') || pathname.startsWith('/api/subscription-lifecycle') || pathname.startsWith('/api/communications-sync')) return 'manage_integrations';
   if (pathname.startsWith('/api/device-control')) return 'control_devices';
   if (pathname.startsWith('/api/phone-control') || pathname.startsWith('/api/retell/')) return 'make_calls';
