@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revokePasskey } from '@/lib/passkey-memory';
+import { listActivePasskeys, revokePasskey } from '@/lib/passkey-memory';
 import {
   createPasskeyAuthenticationOptions,
   createPasskeyRegistrationOptions,
@@ -64,14 +64,29 @@ export async function POST(request: Request) {
       if (!credentialId) return NextResponse.json({ error: 'credentialId is required.' }, { status: 400 });
       if (context.delegated) {
         if (!context.session) return NextResponse.json({ error: 'Delegated session is unavailable.' }, { status: 401 });
+        const activePasskeys = await listActivePasskeys(context.profileId, context.principal.id);
         const stepUp = verifyPrincipalStepUpToken(typeof body?.stepUpToken === 'string' ? body.stepUpToken : undefined);
         const live = await validatePrincipalSession({ profileId: context.profileId, principalId: context.principal.id, sessionId: context.session.id, tokenVersion: context.session.tokenVersion });
-        if (!stepUp || !live || stepUp.purpose !== 'authority-management' || stepUp.profileId !== context.profileId || stepUp.principalId !== context.principal.id || stepUp.sessionId !== live.id || stepUp.tokenVersion !== live.tokenVersion) {
+        const valid = Boolean(
+          stepUp
+          && live
+          && stepUp.purpose === 'authority-management'
+          && stepUp.profileId === context.profileId
+          && stepUp.principalId === context.principal.id
+          && stepUp.sessionId === live.id
+          && stepUp.tokenVersion === live.tokenVersion
+          && (!activePasskeys.length || stepUp.method === 'passkey')
+        );
+        if (!valid) {
           await recordSecurityEventSafe(context.profileId, {
-            category: 'passkey', action: 'passkey.revoke_denied', outcome: 'denied', severity: 'high',
+            category: 'passkey', action: 'passkey.step_up_required', outcome: 'info', severity: 'normal',
             actorPrincipalId: context.principal.id, subjectId: credentialId, sessionId: context.session.id, clientFingerprint: fingerprint,
           });
-          return NextResponse.json({ error: 'Fresh passkey or delegated step-up authorization is required to revoke a passkey.', stepUpRequired: true, stepUpMethod: 'passkey' }, { status: 428 });
+          return NextResponse.json({
+            error: activePasskeys.length ? 'Fresh passkey authorization is required to revoke a passkey.' : 'Fresh delegated step-up authorization is required to revoke a passkey.',
+            stepUpRequired: true,
+            stepUpMethod: activePasskeys.length ? 'passkey' : 'access-grant',
+          }, { status: 428 });
         }
       }
       const passkey = await revokePasskey(context.profileId, context.principal.id, credentialId);
