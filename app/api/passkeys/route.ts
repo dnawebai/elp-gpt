@@ -9,6 +9,7 @@ import {
 } from '@/lib/passkey-service';
 import { validatePrincipalSession } from '@/lib/principal-sessions';
 import { verifyPrincipalStepUpToken, type PrincipalStepUpPurpose } from '@/lib/security';
+import { recordSecurityEventSafe, securityClientFingerprint } from '@/lib/security-audit';
 import { resolveZeroTrustAuthority } from '@/lib/zero-trust-authority';
 
 export const runtime = 'nodejs';
@@ -30,12 +31,18 @@ export async function POST(request: Request) {
   if (!context) return NextResponse.json({ error: 'Identity not established or delegated session revoked.' }, { status: 401 });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const action = typeof body?.action === 'string' ? body.action : '';
+  const fingerprint = securityClientFingerprint(request);
   try {
     if (action === 'registration-options') {
       return NextResponse.json(await createPasskeyRegistrationOptions(request, context), { headers: { 'Cache-Control': 'no-store, private' } });
     }
     if (action === 'registration-verify') {
       const passkey = await verifyPasskeyRegistration(request, context, { challengeToken: body?.challengeToken, response: body?.response, label: body?.label });
+      await recordSecurityEventSafe(context.profileId, {
+        category: 'passkey', action: 'passkey.registered', outcome: 'success', severity: 'high',
+        actorPrincipalId: context.principal.id, subjectId: passkey.id, sessionId: context.session?.id,
+        detail: passkey.label, clientFingerprint: fingerprint,
+      });
       return NextResponse.json({ ok: true, verified: true, passkey }, { status: 201, headers: { 'Cache-Control': 'no-store, private' } });
     }
     if (action === 'authentication-options') {
@@ -45,6 +52,11 @@ export async function POST(request: Request) {
     }
     if (action === 'authentication-verify') {
       const result = await verifyPasskeyAuthentication(request, context, { challengeToken: body?.challengeToken, response: body?.response });
+      await recordSecurityEventSafe(context.profileId, {
+        category: 'passkey', action: 'passkey.step_up_verified', outcome: 'success', severity: 'normal',
+        actorPrincipalId: context.principal.id, sessionId: context.session?.id,
+        detail: result.purpose, clientFingerprint: fingerprint,
+      });
       return NextResponse.json({ ok: true, ...result }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
     if (action === 'revoke') {
@@ -55,14 +67,32 @@ export async function POST(request: Request) {
         const stepUp = verifyPrincipalStepUpToken(typeof body?.stepUpToken === 'string' ? body.stepUpToken : undefined);
         const live = await validatePrincipalSession({ profileId: context.profileId, principalId: context.principal.id, sessionId: context.session.id, tokenVersion: context.session.tokenVersion });
         if (!stepUp || !live || stepUp.purpose !== 'authority-management' || stepUp.profileId !== context.profileId || stepUp.principalId !== context.principal.id || stepUp.sessionId !== live.id || stepUp.tokenVersion !== live.tokenVersion) {
-          return NextResponse.json({ error: 'Fresh passkey or delegated step-up authorization is required to revoke a passkey.' }, { status: 428 });
+          await recordSecurityEventSafe(context.profileId, {
+            category: 'passkey', action: 'passkey.revoke_denied', outcome: 'denied', severity: 'high',
+            actorPrincipalId: context.principal.id, subjectId: credentialId, sessionId: context.session.id, clientFingerprint: fingerprint,
+          });
+          return NextResponse.json({ error: 'Fresh passkey or delegated step-up authorization is required to revoke a passkey.', stepUpRequired: true, stepUpMethod: 'passkey' }, { status: 428 });
         }
       }
       const passkey = await revokePasskey(context.profileId, context.principal.id, credentialId);
+      await recordSecurityEventSafe(context.profileId, {
+        category: 'passkey', action: 'passkey.revoked', outcome: 'success', severity: 'high',
+        actorPrincipalId: context.principal.id, subjectId: credentialId, sessionId: context.session?.id,
+        detail: passkey.label, clientFingerprint: fingerprint,
+      });
       return NextResponse.json({ ok: true, passkey: { id: passkey.id, label: passkey.label, revokedAt: passkey.revokedAt } });
     }
     return NextResponse.json({ error: 'Unsupported passkey action.' }, { status: 400 });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Passkey operation failed.' }, { status: 400, headers: { 'Cache-Control': 'no-store, private' } });
+    const message = error instanceof Error ? error.message : 'Passkey operation failed.';
+    if (action === 'registration-verify' || action === 'authentication-verify') {
+      await recordSecurityEventSafe(context.profileId, {
+        category: 'passkey',
+        action: action === 'registration-verify' ? 'passkey.registration_failed' : 'passkey.verification_failed',
+        outcome: 'failure', severity: 'high', actorPrincipalId: context.principal.id,
+        sessionId: context.session?.id, detail: message.slice(0, 500), clientFingerprint: fingerprint,
+      });
+    }
+    return NextResponse.json({ error: message }, { status: 400, headers: { 'Cache-Control': 'no-store, private' } });
   }
 }
