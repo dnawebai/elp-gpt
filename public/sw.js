@@ -1,4 +1,4 @@
-const CACHE = 'elp-gpt-shell-v3';
+const CACHE = 'elp-gpt-shell-v4';
 const SHELL = ['/', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -18,15 +18,24 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
+  event.respondWith((async () => {
+    try {
+      const response = await fetch(event.request);
+      if (response.ok) {
         const clone = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, clone)).catch(() => undefined);
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/'))),
-  );
+        void caches.open(CACHE).then((cache) => cache.put(event.request, clone)).catch(() => undefined);
+      }
+      return response;
+    } catch {
+      const cached = await caches.match(event.request);
+      if (cached) return cached;
+      if (event.request.mode === 'navigate') {
+        const shell = await caches.match('/');
+        if (shell) return shell;
+      }
+      return Response.error();
+    }
+  })());
 });
 
 self.addEventListener('push', (event) => {
