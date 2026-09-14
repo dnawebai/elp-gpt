@@ -7,6 +7,7 @@ import './retell-call.css';
 import './responsive-polish.css';
 import type { Metadata, Viewport } from 'next';
 import InstallAppPrompt from './InstallAppPrompt';
+import PasskeyStepUpBridge from './PasskeyStepUpBridge';
 import RetellCallDock from './RetellCallDock';
 import ServiceWorkerRegistration from './ServiceWorkerRegistration';
 
@@ -86,6 +87,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           dangerouslySetInnerHTML={{ __html: JSON.stringify(webAppSchema) }}
         />
         <ServiceWorkerRegistration />
+        <PasskeyStepUpBridge />
         {children}
         <RetellCallDock />
         <InstallAppPrompt />
