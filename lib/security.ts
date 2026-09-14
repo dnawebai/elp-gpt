@@ -3,10 +3,15 @@ import { getElpSessionSecret } from '@/lib/elp-config';
 import { mintSignedToken, verifySignedToken } from '@/lib/token-codec';
 
 export const PROFILE_COOKIE = 'elp_profile';
+export const AUTHORITY_COOKIE = 'elp_authority';
 
 type SecurityMode = 'dedicated' | 'service-derived' | 'development';
 type GatewayClaims = { kind: 'voice'; profileId: string; sessionId: string; exp: number };
 type ProfileClaims = { kind: 'profile'; profileId: string; exp: number };
+type PrincipalAccessClaims = { kind: 'principal-access'; profileId: string; principalId: string; nonce: string; exp: number };
+type PrincipalSessionClaims = { kind: 'principal-session'; profileId: string; principalId: string; exp: number };
+type CompanionEnrollmentClaims = { kind: 'companion-enrollment'; profileId: string; principalId: string; enrollmentId: string; nonce: string; exp: number };
+type CompanionClaims = { kind: 'companion'; profileId: string; principalId: string; deviceId: string; tokenVersion: string; exp: number };
 export type ActionTokenStage = 'proposal' | 'approved';
 export type ActionTokenRisk = 'read' | 'write' | 'high';
 type ActionClaims = {
@@ -17,6 +22,7 @@ type ActionClaims = {
   digest: string;
   risk: ActionTokenRisk;
   nonce: string;
+  principalId?: string;
   exp: number;
 };
 
@@ -57,6 +63,58 @@ export function verifyProfileToken(token: string | undefined) {
   return claims;
 }
 
+export function createPrincipalAccessToken(profileId: string, principalId: string, ttlSeconds = 86_400) {
+  return mint<PrincipalAccessClaims>({
+    kind: 'principal-access', profileId, principalId, nonce: randomUUID(),
+    exp: Math.floor(Date.now() / 1000) + Math.max(300, Math.min(ttlSeconds, 86_400)),
+  });
+}
+
+export function verifyPrincipalAccessToken(token: string | undefined) {
+  const claims = verify<PrincipalAccessClaims>(token);
+  if (!claims || claims.kind !== 'principal-access' || !isSafeId(claims.profileId) || !isSafeId(claims.principalId) || !isSafeId(claims.nonce)) return null;
+  return claims;
+}
+
+export function createPrincipalSessionToken(profileId: string, principalId: string, ttlSeconds = 60 * 60 * 24 * 30) {
+  return mint<PrincipalSessionClaims>({
+    kind: 'principal-session', profileId, principalId,
+    exp: Math.floor(Date.now() / 1000) + Math.max(900, Math.min(ttlSeconds, 60 * 60 * 24 * 90)),
+  });
+}
+
+export function verifyPrincipalSessionToken(token: string | undefined) {
+  const claims = verify<PrincipalSessionClaims>(token);
+  if (!claims || claims.kind !== 'principal-session' || !isSafeId(claims.profileId) || !isSafeId(claims.principalId)) return null;
+  return claims;
+}
+
+export function createCompanionEnrollmentToken(input: { profileId: string; principalId: string; enrollmentId: string; nonce: string; ttlSeconds?: number }) {
+  return mint<CompanionEnrollmentClaims>({
+    kind: 'companion-enrollment', profileId: input.profileId, principalId: input.principalId, enrollmentId: input.enrollmentId, nonce: input.nonce,
+    exp: Math.floor(Date.now() / 1000) + Math.max(300, Math.min(input.ttlSeconds || 1800, 86_400)),
+  });
+}
+
+export function verifyCompanionEnrollmentToken(token: string | undefined) {
+  const claims = verify<CompanionEnrollmentClaims>(token);
+  if (!claims || claims.kind !== 'companion-enrollment' || !isSafeId(claims.profileId) || !isSafeId(claims.principalId) || !isSafeId(claims.enrollmentId) || !isSafeId(claims.nonce)) return null;
+  return claims;
+}
+
+export function createCompanionToken(input: { profileId: string; principalId: string; deviceId: string; tokenVersion: string; ttlSeconds?: number }) {
+  return mint<CompanionClaims>({
+    kind: 'companion', profileId: input.profileId, principalId: input.principalId, deviceId: input.deviceId, tokenVersion: input.tokenVersion,
+    exp: Math.floor(Date.now() / 1000) + Math.max(3600, Math.min(input.ttlSeconds || 60 * 60 * 24 * 90, 60 * 60 * 24 * 180)),
+  });
+}
+
+export function verifyCompanionToken(token: string | undefined) {
+  const claims = verify<CompanionClaims>(token);
+  if (!claims || claims.kind !== 'companion' || !isSafeId(claims.profileId) || !isSafeId(claims.principalId) || !isSafeId(claims.deviceId) || !isSafeId(claims.tokenVersion)) return null;
+  return claims;
+}
+
 export function createVoiceGatewayToken(profileId: string, sessionId: string) {
   return mint<GatewayClaims>({
     kind: 'voice',
@@ -86,6 +144,7 @@ export function createActionToken(input: {
   digest: string;
   risk: ActionTokenRisk;
   nonce?: string;
+  principalId?: string;
   ttlSeconds?: number;
 }) {
   return mint<ActionClaims>({
@@ -96,6 +155,7 @@ export function createActionToken(input: {
     digest: input.digest,
     risk: input.risk,
     nonce: input.nonce || randomUUID(),
+    ...(input.principalId ? { principalId: input.principalId } : {}),
     exp: Math.floor(Date.now() / 1000) + Math.max(30, Math.min(input.ttlSeconds || 300, 600)),
   });
 }
@@ -110,7 +170,8 @@ export function verifyActionToken(token: string | undefined) {
     !/^[A-Za-z0-9_-]{20,100}$/.test(claims.digest) ||
     !['proposal', 'approved'].includes(claims.stage) ||
     !['read', 'write', 'high'].includes(claims.risk) ||
-    typeof claims.nonce !== 'string'
+    typeof claims.nonce !== 'string' ||
+    (claims.principalId !== undefined && !isSafeId(claims.principalId))
   ) {
     return null;
   }
