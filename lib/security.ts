@@ -9,7 +9,26 @@ type SecurityMode = 'dedicated' | 'service-derived' | 'development';
 type GatewayClaims = { kind: 'voice'; profileId: string; sessionId: string; exp: number };
 type ProfileClaims = { kind: 'profile'; profileId: string; exp: number };
 type PrincipalAccessClaims = { kind: 'principal-access'; profileId: string; principalId: string; nonce: string; exp: number };
-type PrincipalSessionClaims = { kind: 'principal-session'; profileId: string; principalId: string; exp: number };
+export type PrincipalSessionAssurance = 'standard' | 'step_up';
+type PrincipalSessionClaims = {
+  kind: 'principal-session';
+  profileId: string;
+  principalId: string;
+  sessionId: string;
+  tokenVersion: string;
+  assurance: PrincipalSessionAssurance;
+  exp: number;
+};
+type PrincipalStepUpClaims = {
+  kind: 'principal-step-up';
+  profileId: string;
+  principalId: string;
+  sessionId: string;
+  tokenVersion: string;
+  purpose: 'high-risk-approval' | 'authority-management';
+  nonce: string;
+  exp: number;
+};
 type CompanionEnrollmentClaims = { kind: 'companion-enrollment'; profileId: string; principalId: string; enrollmentId: string; nonce: string; exp: number };
 type CompanionClaims = { kind: 'companion'; profileId: string; principalId: string; deviceId: string; tokenVersion: string; exp: number };
 export type ActionTokenStage = 'proposal' | 'approved';
@@ -76,16 +95,69 @@ export function verifyPrincipalAccessToken(token: string | undefined) {
   return claims;
 }
 
-export function createPrincipalSessionToken(profileId: string, principalId: string, ttlSeconds = 60 * 60 * 24 * 30) {
+export function createPrincipalSessionToken(
+  profileId: string,
+  principalId: string,
+  options: number | {
+    ttlSeconds?: number;
+    sessionId?: string;
+    tokenVersion?: string;
+    assurance?: PrincipalSessionAssurance;
+  } = 60 * 60 * 12,
+) {
+  const config = typeof options === 'number' ? { ttlSeconds: options } : options;
+  const ttlSeconds = Math.max(900, Math.min(config.ttlSeconds || 60 * 60 * 12, 60 * 60 * 24 * 30));
   return mint<PrincipalSessionClaims>({
-    kind: 'principal-session', profileId, principalId,
-    exp: Math.floor(Date.now() / 1000) + Math.max(900, Math.min(ttlSeconds, 60 * 60 * 24 * 90)),
+    kind: 'principal-session',
+    profileId,
+    principalId,
+    sessionId: config.sessionId || randomUUID(),
+    tokenVersion: config.tokenVersion || randomUUID(),
+    assurance: config.assurance || 'standard',
+    exp: Math.floor(Date.now() / 1000) + ttlSeconds,
   });
 }
 
 export function verifyPrincipalSessionToken(token: string | undefined) {
   const claims = verify<PrincipalSessionClaims>(token);
-  if (!claims || claims.kind !== 'principal-session' || !isSafeId(claims.profileId) || !isSafeId(claims.principalId)) return null;
+  if (
+    !claims || claims.kind !== 'principal-session' ||
+    !isSafeId(claims.profileId) || !isSafeId(claims.principalId) ||
+    !isSafeId(claims.sessionId) || !isSafeId(claims.tokenVersion) ||
+    !['standard','step_up'].includes(claims.assurance)
+  ) return null;
+  return claims;
+}
+
+export function createPrincipalStepUpToken(input: {
+  profileId: string;
+  principalId: string;
+  sessionId: string;
+  tokenVersion: string;
+  purpose: PrincipalStepUpClaims['purpose'];
+  ttlSeconds?: number;
+}) {
+  return mint<PrincipalStepUpClaims>({
+    kind: 'principal-step-up',
+    profileId: input.profileId,
+    principalId: input.principalId,
+    sessionId: input.sessionId,
+    tokenVersion: input.tokenVersion,
+    purpose: input.purpose,
+    nonce: randomUUID(),
+    exp: Math.floor(Date.now() / 1000) + Math.max(30, Math.min(input.ttlSeconds || 300, 600)),
+  });
+}
+
+export function verifyPrincipalStepUpToken(token: string | undefined) {
+  const claims = verify<PrincipalStepUpClaims>(token);
+  if (
+    !claims || claims.kind !== 'principal-step-up' ||
+    !isSafeId(claims.profileId) || !isSafeId(claims.principalId) ||
+    !isSafeId(claims.sessionId) || !isSafeId(claims.tokenVersion) ||
+    !isSafeId(claims.nonce) ||
+    !['high-risk-approval','authority-management'].includes(claims.purpose)
+  ) return null;
   return claims;
 }
 

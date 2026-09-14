@@ -1,13 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getLatestExecutionSchedule } from '@/lib/execution-schedule-memory';
-import { PROFILE_COOKIE, verifyProfileToken } from '@/lib/security';
+import { requireZeroTrustAuthority } from '@/lib/zero-trust-authority';
 
 export const runtime = 'nodejs';
-
-function profileFrom(request: Request) {
-  const token = (request.headers.get('cookie') || '').split(';').map((part) => part.trim()).find((part) => part.startsWith(`${PROFILE_COOKIE}=`))?.slice(PROFILE_COOKIE.length + 1);
-  return verifyProfileToken(token);
-}
 
 function actionFor(block: NonNullable<Awaited<ReturnType<typeof getLatestExecutionSchedule>>>['blocks'][number], timezone: string) {
   return {
@@ -31,9 +26,11 @@ function actionFor(block: NonNullable<Awaited<ReturnType<typeof getLatestExecuti
 }
 
 export async function GET(request: Request) {
-  const profile = profileFrom(request); if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
-  const schedule = await getLatestExecutionSchedule(profile.profileId); if (!schedule) return NextResponse.json({ actions: [], schedule: null });
+  const context = await requireZeroTrustAuthority(request, 'manage_calendar');
+  if (!context) return NextResponse.json({ error: 'Active principal session with calendar-management permission is required.' }, { status: 403 });
+  const schedule = await getLatestExecutionSchedule(context.profileId);
+  if (!schedule) return NextResponse.json({ actions: [], schedule: null });
   const url = new URL(request.url); const blockId = url.searchParams.get('blockId');
   const eligible = schedule.blocks.filter((block) => !['prep', 'buffer'].includes(block.kind) && Date.parse(block.end) > Date.now() && (!blockId || block.id === blockId));
-  return NextResponse.json({ scheduleId: schedule.id, actions: eligible.map((block) => ({ blockId: block.id, block, action: actionFor(block, schedule.timezone) })) }, { headers: { 'Cache-Control': 'no-store, private' } });
+  return NextResponse.json({ scheduleId: schedule.id, principalId: context.principal.id, actions: eligible.map((block) => ({ blockId: block.id, block, action: actionFor(block, schedule.timezone) })) }, { headers: { 'Cache-Control': 'no-store, private' } });
 }

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { hasCapability } from '@/lib/authority-policy';
 import { deviceAgentConfigured, enqueueDeviceCommand, listDeviceCommands, type DeviceCommandType } from '@/lib/device-control';
-import { listCompanionDevices, resolveAuthorityContext } from '@/lib/principal-authority';
+import { listCompanionDevices } from '@/lib/principal-authority';
+import { requireZeroTrustAuthority } from '@/lib/zero-trust-authority';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
-  const context = await resolveAuthorityContext(request);
-  if (!context) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
+  const context = await requireZeroTrustAuthority(request, 'read_context');
+  if (!context) return NextResponse.json({ error: 'Authorized principal session is required.' }, { status: 401 });
   const devices = await listCompanionDevices(context.profileId);
   const activeDevices = devices.filter((item) => item.status === 'active');
   return NextResponse.json({
@@ -19,9 +19,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const context = await resolveAuthorityContext(request);
-  if (!context) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
-  if (!hasCapability(context.principal.role, 'control_devices', context.principal.capabilities)) return NextResponse.json({ error: 'Device-control permission is required.' }, { status: 403 });
+  const context = await requireZeroTrustAuthority(request, 'control_devices');
+  if (!context) return NextResponse.json({ error: 'Active principal session with device-control permission is required.' }, { status: 403 });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const type = typeof body?.type === 'string' ? body.type as DeviceCommandType : 'focus_on';
   const devices = (await listCompanionDevices(context.profileId)).filter((item) => item.status === 'active');
@@ -35,7 +34,7 @@ export async function POST(request: Request) {
       typeof body?.target === 'string' ? body.target : undefined,
       { targetDeviceId: targetDeviceId || undefined, requestedByPrincipalId: context.principal.id, allowWithoutLegacyAgent: Boolean(targetDeviceId) },
     );
-    return NextResponse.json({ ok: true, command });
+    return NextResponse.json({ ok: true, command, requestedByPrincipalId: context.principal.id });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Device command failed.' }, { status: 503 });
   }
