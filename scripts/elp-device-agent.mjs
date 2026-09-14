@@ -1,14 +1,19 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
+import { mkdir, readFile, writeFile, chmod } from 'node:fs/promises';
 import os from 'node:os';
+import path from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const baseUrl = (process.env.ELP_DEVICE_SERVER_URL || 'https://elpgpt.com').replace(/\/$/, '');
-const token = process.env.ELP_DEVICE_AGENT_TOKEN?.trim();
-const deviceId = (process.env.ELP_DEVICE_ID || `${os.hostname()}-${process.platform}`).slice(0, 120);
+const legacyToken = process.env.ELP_DEVICE_AGENT_TOKEN?.trim();
+const enrollmentToken = process.env.ELP_COMPANION_ENROLLMENT_TOKEN?.trim();
+const deviceId = (process.env.ELP_DEVICE_ID || `${os.hostname()}-${process.platform}`).replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 96);
+const deviceLabel = (process.env.ELP_DEVICE_LABEL || os.hostname()).slice(0, 120);
 const intervalMs = Math.max(5_000, Number(process.env.ELP_DEVICE_POLL_MS || 15_000));
-if (!token) throw new Error('ELP_DEVICE_AGENT_TOKEN is required.');
+const tokenFile = process.env.ELP_COMPANION_TOKEN_FILE || path.join(os.homedir(), '.elp', 'companion-token');
+let token = process.env.ELP_COMPANION_TOKEN?.trim() || '';
 
 async function run(file, args) {
   const { stdout, stderr } = await execFileAsync(file, args, { timeout: 30_000, windowsHide: true, maxBuffer: 1024 * 1024 });
@@ -43,10 +48,46 @@ async function execute(command) {
   }
 }
 
-async function request(path, init = {}) {
-  const response = await fetch(`${baseUrl}${path}`, {
+async function readPersistedToken() {
+  try { return (await readFile(tokenFile, 'utf8')).trim(); } catch { return ''; }
+}
+
+async function persistToken(value) {
+  await mkdir(path.dirname(tokenFile), { recursive: true, mode: 0o700 });
+  await writeFile(tokenFile, `${value}\n`, { mode: 0o600 });
+  try { await chmod(tokenFile, 0o600); } catch {}
+}
+
+async function enroll() {
+  if (!enrollmentToken) return '';
+  const response = await fetch(`${baseUrl}/api/companion/enroll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enrollmentToken, deviceId, label: deviceLabel, platform: process.platform, agentVersion: '1.0.0' }),
+    signal: AbortSignal.timeout(35_000),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.companionToken) throw new Error(data.error || `Companion enrollment failed (${response.status}).`);
+  await persistToken(data.companionToken);
+  console.log(`ELP companion enrolled as ${data.device?.label || deviceLabel}.`);
+  return data.companionToken;
+}
+
+async function ensureToken() {
+  if (token) return token;
+  token = await readPersistedToken();
+  if (token) return token;
+  token = await enroll();
+  if (token) return token;
+  if (legacyToken) { token = legacyToken; return token; }
+  throw new Error('Provide ELP_COMPANION_ENROLLMENT_TOKEN once, ELP_COMPANION_TOKEN, or the legacy ELP_DEVICE_AGENT_TOKEN.');
+}
+
+async function request(pathname, init = {}) {
+  const auth = await ensureToken();
+  const response = await fetch(`${baseUrl}${pathname}`, {
     ...init,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
+    headers: { Authorization: `Bearer ${auth}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
     signal: AbortSignal.timeout(35_000),
   });
   const data = await response.json().catch(() => ({}));
@@ -64,8 +105,9 @@ async function tick() {
   }
 }
 
-console.log(`ELP device agent active as ${deviceId}; polling ${baseUrl}.`);
+await ensureToken();
+console.log(`ELP companion active as ${deviceId}; polling ${baseUrl}.`);
 for (;;) {
-  try { await tick(); } catch (error) { console.error('ELP device agent:', error instanceof Error ? error.message : error); }
+  try { await tick(); } catch (error) { console.error('ELP companion:', error instanceof Error ? error.message : error); }
   await new Promise((resolve) => setTimeout(resolve, intervalMs));
 }
