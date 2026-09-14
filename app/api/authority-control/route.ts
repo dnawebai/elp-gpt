@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { hasCapability, isPrincipalRole } from '@/lib/authority-policy';
+import { listActivePasskeys } from '@/lib/passkey-memory';
 import {
   authoritySnapshot,
   createCompanionEnrollment,
@@ -22,12 +23,15 @@ async function manager(request: Request) {
 }
 
 async function requireAuthorityStepUp(context: NonNullable<Awaited<ReturnType<typeof manager>>>, body: Record<string, unknown> | null) {
-  if (!context.delegated) return true;
-  if (!context.session) return false;
+  const passkeys = await listActivePasskeys(context.profileId, context.principal.id);
+  if (!context.delegated && !passkeys.length) return true;
   const stepUp = verifyPrincipalStepUpToken(typeof body?.stepUpToken === 'string' ? body.stepUpToken : undefined);
-  if (!stepUp || stepUp.purpose !== 'authority-management') return false;
+  if (!stepUp || stepUp.purpose !== 'authority-management' || stepUp.profileId !== context.profileId || stepUp.principalId !== context.principal.id) return false;
+  if (passkeys.length && stepUp.method !== 'passkey') return false;
+  if (!context.delegated) return stepUp.sessionId === 'owner' && stepUp.tokenVersion === 'owner';
+  if (!context.session) return false;
   const live = await validatePrincipalSession({ profileId: context.profileId, principalId: context.principal.id, sessionId: context.session.id, tokenVersion: context.session.tokenVersion });
-  return Boolean(live && stepUp.profileId === context.profileId && stepUp.principalId === context.principal.id && stepUp.sessionId === live.id && stepUp.tokenVersion === live.tokenVersion);
+  return Boolean(live && stepUp.sessionId === live.id && stepUp.tokenVersion === live.tokenVersion);
 }
 
 async function snapshot(profileId: string) {
@@ -46,7 +50,10 @@ export async function POST(request: Request) {
   if (!context) return NextResponse.json({ error: 'Authority management permission is required.' }, { status: 403 });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const action = typeof body?.action === 'string' ? body.action : '';
-  if (!(await requireAuthorityStepUp(context, body))) return NextResponse.json({ error: 'Fresh delegated step-up authorization is required for authority changes.' }, { status: 428 });
+  if (!(await requireAuthorityStepUp(context, body))) {
+    const hasPasskey = (await listActivePasskeys(context.profileId, context.principal.id)).length > 0;
+    return NextResponse.json({ error: hasPasskey ? 'A fresh passkey verification is required for authority changes.' : 'Fresh delegated step-up authorization is required for authority changes.', stepUpRequired: true, stepUpMethod: hasPasskey ? 'passkey' : 'access-grant' }, { status: 428 });
+  }
   try {
     if (action === 'create-principal') {
       const role = body?.role;
