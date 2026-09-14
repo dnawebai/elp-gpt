@@ -136,6 +136,20 @@ export async function revokeAllPrincipalSessions(profileId: string, principalId:
   return results;
 }
 
+export async function consumePrincipalAccessNonce(profileId: string, principalId: string, nonce: string) {
+  const handles = await sessionFor(profileId);
+  if (!handles) throw new Error('Principal session registry is unavailable.');
+  const messages = await listHonchoMessages(handles.session, { pageSize: 100, maxPages: 20, reverse: true });
+  const alreadyUsed = messages.some((message) => message.metadata?.elpPrincipalAccessConsumed === true && message.metadata?.accessNonce === nonce);
+  if (alreadyUsed) return false;
+  await handles.session.addMessages([{
+    peerId: handles.user.id,
+    content: `[PRINCIPAL_ACCESS_CONSUMED] ${principalId}`,
+    metadata: { elpPrincipalAccessConsumed: true, recordVersion: 1, principalId, accessNonce: nonce, consumedAt: new Date().toISOString() },
+  }]);
+  return true;
+}
+
 export function sessionIsFreshStepUp(item: PrincipalSessionRecord | null, maxAgeMinutes = 10) {
   if (!item || item.status !== 'active' || item.assurance !== 'step_up') return false;
   const created = Date.parse(item.createdAt);
