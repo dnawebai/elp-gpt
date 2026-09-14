@@ -21,6 +21,8 @@ import { resolveZeroTrustAuthority } from '@/lib/zero-trust-authority';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+type StepUpPurpose = 'high-risk-approval' | 'authority-management';
+
 function cookie(request: Request, name: string) {
   return (request.headers.get('cookie') || '').split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1);
 }
@@ -73,14 +75,18 @@ export async function POST(request: Request) {
 
   if (action === 'step-up') {
     if (!context.delegated || !context.session) return NextResponse.json({ error: 'Step-up is only required for delegated principal sessions.' }, { status: 400 });
+    const purposeRaw = typeof body?.purpose === 'string' ? body.purpose : 'high-risk-approval';
+    if (!['high-risk-approval','authority-management'].includes(purposeRaw)) return NextResponse.json({ error: 'Invalid step-up purpose.' }, { status: 400 });
+    const purpose = purposeRaw as StepUpPurpose;
+    if (purpose === 'authority-management' && !hasCapability(context.principal.role, 'manage_authority', context.principal.capabilities)) return NextResponse.json({ error: 'Authority management permission is required.' }, { status: 403 });
     const access = verifyPrincipalAccessToken(typeof body?.accessToken === 'string' ? body.accessToken : undefined);
     if (!access || access.profileId !== context.profileId || access.principalId !== context.principal.id) return NextResponse.json({ error: 'Fresh access grant for this principal is required.' }, { status: 401 });
     const consumed = await consumePrincipalAccessNonce(context.profileId, context.principal.id, access.nonce);
     if (!consumed) return NextResponse.json({ error: 'Principal access grant has already been used.' }, { status: 409 });
     const current = await validatePrincipalSession({ profileId: context.profileId, principalId: context.principal.id, sessionId: context.session.id, tokenVersion: context.session.tokenVersion });
     if (!current) return NextResponse.json({ error: 'Delegated session is no longer valid.' }, { status: 401 });
-    const stepUpToken = createPrincipalStepUpToken({ profileId: context.profileId, principalId: context.principal.id, sessionId: current.id, tokenVersion: current.tokenVersion, purpose: 'high-risk-approval', ttlSeconds: 300 });
-    return NextResponse.json({ ok: true, stepUpToken, expiresInSeconds: 300 }, { headers: { 'Cache-Control': 'no-store, private' } });
+    const stepUpToken = createPrincipalStepUpToken({ profileId: context.profileId, principalId: context.principal.id, sessionId: current.id, tokenVersion: current.tokenVersion, purpose, ttlSeconds: 300 });
+    return NextResponse.json({ ok: true, stepUpToken, purpose, expiresInSeconds: 300 }, { headers: { 'Cache-Control': 'no-store, private' } });
   }
 
   if (action === 'revoke-current') {
