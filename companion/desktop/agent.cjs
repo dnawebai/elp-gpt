@@ -6,103 +6,48 @@ const path = require('node:path');
 const { promisify } = require('node:util');
 const execFileAsync = promisify(execFile);
 
-function safeBaseUrl(value) {
-  const url = new URL(value || 'https://elpgpt.com');
-  if (url.protocol !== 'https:') throw new Error('ELP server must use HTTPS.');
-  return url.origin;
+function safeBaseUrl(value){const url=new URL(value||'https://elpgpt.com');if(url.protocol!=='https:')throw new Error('ELP server must use HTTPS.');return url.origin;}
+async function run(file,args,options={}){const {stdout,stderr}=await execFileAsync(file,args,{timeout:options.timeout||30000,windowsHide:true,maxBuffer:1024*1024,cwd:options.cwd});return `${stdout||''}${stderr||''}`.trim().slice(0,4000);}
+function jsonTarget(command){try{const v=JSON.parse(command.target||'{}');if(!v||typeof v!=='object'||Array.isArray(v))throw new Error();return v;}catch{throw new Error('Invalid structured command target.');}}
+function roots(){const configured=(process.env.ELP_DEVICE_FILE_ROOTS||'').split(path.delimiter).map((x)=>x.trim()).filter(Boolean);return configured.length?configured.map((x)=>path.resolve(x)):[path.join(os.homedir(),'Desktop'),path.join(os.homedir(),'Documents'),path.join(os.homedir(),'Downloads')].map((x)=>path.resolve(x));}
+function safePath(value){const resolved=path.resolve(String(value||''));if(!roots().some((root)=>resolved===root||resolved.startsWith(root+path.sep)))throw new Error('Path is outside configured ELP file roots.');return resolved;}
+async function screenshotFile(){const file=path.join(os.tmpdir(),`elp-screen-${Date.now()}.png`);if(process.platform==='darwin')await run('/usr/sbin/screencapture',['-x',file]);else if(process.platform==='win32')await run('powershell.exe',['-NoProfile','-NonInteractive','-Command',`Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; $i=New-Object Drawing.Bitmap $b.Width,$b.Height; $g=[Drawing.Graphics]::FromImage($i); $g.CopyFromScreen($b.Location,[Drawing.Point]::Empty,$b.Size); $i.Save('${file.replaceAll("'","''")}'); $g.Dispose(); $i.Dispose()`]);else await run('gnome-screenshot',['-f',file]);return file;}
+async function macTypeText(text){return run('/usr/bin/osascript',['-e','on run argv','-e','tell application "System Events" to keystroke (item 1 of argv)','-e','end run',text]);}
+async function macKeyPress(key){const map={ENTER:'return',ESC:'escape',TAB:'tab',SPACE:'space',UP:'up arrow',DOWN:'down arrow',LEFT:'left arrow',RIGHT:'right arrow'};const normalized=map[key.toUpperCase()]||key.toLowerCase();return run('/usr/bin/osascript',['-e',`tell application "System Events" to key code (key code of "${normalized.replace(/[^a-z ]/g,'')}")`]).catch(()=>run('/usr/bin/osascript',['-e',`tell application "System Events" to keystroke "${key.replace(/["\\]/g,'')}"`]));}
+async function executeLocal(command,ctx={}){
+ const platform=process.platform;const adapters=ctx.adapters||{};
+ switch(command.type){
+  case 'lock_screen':if(platform==='darwin')return run('/usr/bin/pmset',['displaysleepnow']);if(platform==='win32')return run('rundll32.exe',['user32.dll,LockWorkStation']);return run('loginctl',['lock-session']);
+  case 'open_url':case 'browser_open':{if(!/^https:\/\//i.test(command.target||''))throw new Error('Rejected non-HTTPS URL.');if(adapters.openExternal)return String(await adapters.openExternal(command.target)||'Opened.');if(platform==='darwin')return run('/usr/bin/open',[command.target]);if(platform==='win32')return run('powershell.exe',['-NoProfile','-NonInteractive','-Command','Start-Process -FilePath $args[0]',command.target]);return run('xdg-open',[command.target]);}
+  case 'open_app':{if(!/^[\w .-]{1,120}$/.test(command.target||''))throw new Error('Rejected application name.');if(platform==='darwin')return run('/usr/bin/open',['-a',command.target]);if(platform==='win32')return run('powershell.exe',['-NoProfile','-NonInteractive','-Command','Start-Process -FilePath $args[0]',command.target]);return run(command.target,[]);}
+  case 'focus_on':if(platform==='darwin')return run('/usr/bin/shortcuts',['run',process.env.ELP_FOCUS_ON_SHORTCUT||'ELP Focus On']);throw new Error('Focus-mode actuation requires an OS-specific ELP integration.');
+  case 'focus_off':if(platform==='darwin')return run('/usr/bin/shortcuts',['run',process.env.ELP_FOCUS_OFF_SHORTCUT||'ELP Focus Off']);throw new Error('Focus-mode actuation requires an OS-specific ELP integration.');
+  case 'screenshot':{const file=await screenshotFile();return `Screenshot captured locally: ${file}`;}
+  case 'screen_describe':{const file=await screenshotFile();const bytes=fs.readFileSync(file);if(bytes.length>6*1024*1024)throw new Error('Screenshot exceeds vision upload limit.');const data=await ctx.request('/api/device-vision',{method:'POST',body:JSON.stringify({deviceId:ctx.deviceId,imageBase64:bytes.toString('base64'),prompt:(command.target||'Describe the screen and identify actionable controls.').slice(0,1200)})},ctx.token);try{fs.unlinkSync(file);}catch{}return String(data.description||'Screen analysis completed.');}
+  case 'clipboard_read':if(adapters.clipboardRead)return String(adapters.clipboardRead()).slice(0,4000);if(platform==='darwin')return run('/usr/bin/pbpaste',[]);if(platform==='win32')return run('powershell.exe',['-NoProfile','-NonInteractive','-Command','Get-Clipboard -Raw']);return run('xclip',['-selection','clipboard','-o']);
+  case 'clipboard_write':if(adapters.clipboardWrite){adapters.clipboardWrite(command.target||'');return 'Clipboard updated.';}if(platform==='darwin'){await new Promise((resolve,reject)=>{const p=require('node:child_process').spawn('/usr/bin/pbcopy');p.on('error',reject);p.on('close',(c)=>c===0?resolve():reject(new Error('pbcopy failed')));p.stdin.end(command.target||'');});return 'Clipboard updated.';}throw new Error('Clipboard write adapter is not available on this platform.');
+  case 'file_list':{const t=jsonTarget(command);const dir=safePath(t.path);const entries=fs.readdirSync(dir,{withFileTypes:true}).slice(0,200).map((e)=>({name:e.name,type:e.isDirectory()?'directory':'file'}));return JSON.stringify(entries);}
+  case 'file_read':{const t=jsonTarget(command);const file=safePath(t.path);const stat=fs.statSync(file);if(stat.size>512*1024)throw new Error('File exceeds local read limit.');return fs.readFileSync(file,'utf8').slice(0,4000);}
+  case 'file_write':{const t=jsonTarget(command);const file=safePath(t.path);const content=String(t.content||'');if(content.length>256*1024)throw new Error('File exceeds local write limit.');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content,{flag:t.overwrite===true?'w':'wx'});return `Wrote ${Buffer.byteLength(content)} bytes to ${file}.`;}
+  case 'notify':{const t=jsonTarget(command);if(!adapters.notify)throw new Error('Native notification adapter unavailable.');adapters.notify(String(t.title||'ELP').slice(0,120),String(t.body||'').slice(0,500));return 'Notification displayed.';}
+  case 'type_text':if(platform==='darwin')return macTypeText(command.target||'');if(platform==='win32')return run('powershell.exe',['-NoProfile','-NonInteractive','-Command',`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($args[0])`,command.target||'']);return run('xdotool',['type','--clearmodifiers',command.target||'']);
+  case 'key_press':if(platform==='darwin')return macKeyPress(command.target||'');if(platform==='win32')return run('powershell.exe',['-NoProfile','-NonInteractive','-Command','Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($args[0])',`{${command.target||'ENTER'}}`]);return run('xdotool',['key',command.target||'Return']);
+  case 'mouse_click':{const t=jsonTarget(command);const x=Math.max(0,Math.min(20000,Math.round(Number(t.x))));const y=Math.max(0,Math.min(20000,Math.round(Number(t.y))));if(!Number.isFinite(x)||!Number.isFinite(y))throw new Error('Valid x/y coordinates are required.');if(platform==='darwin')return run('/usr/bin/osascript',['-e',`tell application "System Events" to click at {${x}, ${y}}`]);if(platform==='linux')return run('xdotool',['mousemove',String(x),String(y),'click','1']);throw new Error('Mouse click adapter is not configured for this platform.');}
+  case 'run_process':{const t=jsonTarget(command);const executable=String(t.executable||'').trim();const args=Array.isArray(t.args)?t.args.map((x)=>String(x)).slice(0,40):[];const allowed=(process.env.ELP_DEVICE_PROCESS_ALLOWLIST||'').split(',').map((x)=>x.trim()).filter(Boolean);if(!allowed.includes(executable)||['sh','bash','zsh','cmd','cmd.exe','powershell','powershell.exe'].includes(executable.toLowerCase()))throw new Error('Executable is not in the explicit ELP process allowlist.');return run(executable,args,{cwd:t.cwd?safePath(t.cwd):undefined,timeout:Math.min(120000,Math.max(1000,Number(t.timeoutMs)||30000))});}
+  default:throw new Error(`Unsupported device command: ${command.type}`);
+ }
 }
 
-async function run(file, args) {
-  const { stdout, stderr } = await execFileAsync(file, args, { timeout: 30000, windowsHide: true, maxBuffer: 1024 * 1024 });
-  return `${stdout || ''}${stderr || ''}`.trim().slice(0, 1000);
+function createAgent(options){
+ const baseUrl=safeBaseUrl(options.baseUrl);const statePath=options.statePath;const adapters=options.adapters||{};let timer=null,running=false,lastError='',lastPollAt='';
+ function loadState(){try{return JSON.parse(fs.readFileSync(statePath,'utf8'));}catch{return{};}}
+ function saveState(state){fs.mkdirSync(path.dirname(statePath),{recursive:true,mode:0o700});fs.writeFileSync(statePath,JSON.stringify(state,null,2),{mode:0o600});try{fs.chmodSync(statePath,0o600);}catch{}}
+ function ensureDeviceId(state){if(typeof state.deviceId==='string'&&/^[A-Za-z0-9_-]{1,96}$/.test(state.deviceId))return state.deviceId;state.deviceId=`${os.hostname()}-${process.platform}-${crypto.randomUUID().slice(0,8)}`.replace(/[^A-Za-z0-9_-]/g,'-').slice(0,96);saveState(state);return state.deviceId;}
+ async function request(endpoint,init={},token){const response=await fetch(`${baseUrl}${endpoint}`,{...init,headers:{...(token?{Authorization:`Bearer ${token}`}:{ }),'Content-Type':'application/json',...(init.headers||{})},signal:AbortSignal.timeout(35000)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);return data;}
+ async function enroll(enrollmentToken,label){const state=loadState(),deviceId=ensureDeviceId(state);const data=await request('/api/companion/enroll',{method:'POST',body:JSON.stringify({enrollmentToken,deviceId,label:label||os.hostname(),platform:process.platform,agentVersion:'desktop-0.2.0'})});if(!data.companionToken)throw new Error('Enrollment did not return a companion credential.');state.companionToken=data.companionToken;state.principalId=data.principal?.id;state.label=data.device?.label||label||os.hostname();state.enrolledAt=new Date().toISOString();saveState(state);return status();}
+ async function tick(){const state=loadState(),deviceId=ensureDeviceId(state);if(!state.companionToken)return;lastPollAt=new Date().toISOString();const data=await request(`/api/device-agent?deviceId=${encodeURIComponent(deviceId)}`,{},state.companionToken);for(const command of data.commands||[]){let ok=false,result='';try{result=await executeLocal(command,{adapters,request,token:state.companionToken,deviceId});ok=true;}catch(error){result=error instanceof Error?error.message:'Device command failed.';}await request('/api/device-agent',{method:'POST',body:JSON.stringify({commandId:command.id,deviceId,ok,result})},state.companionToken);}lastError='';}
+ function start(intervalMs=15000){if(running)return;running=true;const loop=async()=>{try{await tick();}catch(error){lastError=error instanceof Error?error.message:String(error);}if(running)timer=setTimeout(loop,Math.max(5000,intervalMs));};void loop();}
+ function stop(){running=false;if(timer)clearTimeout(timer);timer=null;}function signOut(){stop();const state=loadState();delete state.companionToken;delete state.principalId;saveState(state);}function status(){const state=loadState();return{baseUrl,deviceId:ensureDeviceId(state),label:state.label||os.hostname(),principalId:state.principalId||null,enrolled:Boolean(state.companionToken),running,lastPollAt,lastError};}
+ return{enroll,start,stop,signOut,status};
 }
-
-async function executeLocal(command) {
-  const platform = process.platform;
-  switch (command.type) {
-    case 'lock_screen':
-      if (platform === 'darwin') return run('/usr/bin/pmset', ['displaysleepnow']);
-      if (platform === 'win32') return run('rundll32.exe', ['user32.dll,LockWorkStation']);
-      return run('loginctl', ['lock-session']);
-    case 'open_url': {
-      if (!/^https:\/\//i.test(command.target || '')) throw new Error('Rejected non-HTTPS URL.');
-      if (platform === 'darwin') return run('/usr/bin/open', [command.target]);
-      if (platform === 'win32') return run('powershell.exe', ['-NoProfile','-NonInteractive','-Command','Start-Process -FilePath $args[0]', command.target]);
-      return run('xdg-open', [command.target]);
-    }
-    case 'open_app': {
-      if (!/^[\w .-]{1,120}$/.test(command.target || '')) throw new Error('Rejected application name.');
-      if (platform === 'darwin') return run('/usr/bin/open', ['-a', command.target]);
-      if (platform === 'win32') return run('powershell.exe', ['-NoProfile','-NonInteractive','-Command','Start-Process -FilePath $args[0]', command.target]);
-      return run(command.target, []);
-    }
-    case 'focus_on':
-      if (platform === 'darwin') return run('/usr/bin/shortcuts', ['run', process.env.ELP_FOCUS_ON_SHORTCUT || 'ELP Focus On']);
-      throw new Error('Focus-mode actuation requires an OS-specific ELP integration.');
-    case 'focus_off':
-      if (platform === 'darwin') return run('/usr/bin/shortcuts', ['run', process.env.ELP_FOCUS_OFF_SHORTCUT || 'ELP Focus Off']);
-      throw new Error('Focus-mode actuation requires an OS-specific ELP integration.');
-    default: throw new Error(`Unsupported device command: ${command.type}`);
-  }
-}
-
-function createAgent(options) {
-  const baseUrl = safeBaseUrl(options.baseUrl);
-  const statePath = options.statePath;
-  let timer = null;
-  let running = false;
-  let lastError = '';
-  let lastPollAt = '';
-
-  function loadState() {
-    try { return JSON.parse(fs.readFileSync(statePath, 'utf8')); } catch { return {}; }
-  }
-  function saveState(state) {
-    fs.mkdirSync(path.dirname(statePath), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(statePath, JSON.stringify(state, null, 2), { mode: 0o600 });
-    try { fs.chmodSync(statePath, 0o600); } catch {}
-  }
-  function ensureDeviceId(state) {
-    if (typeof state.deviceId === 'string' && /^[A-Za-z0-9_-]{1,96}$/.test(state.deviceId)) return state.deviceId;
-    state.deviceId = `${os.hostname()}-${process.platform}-${crypto.randomUUID().slice(0,8)}`.replace(/[^A-Za-z0-9_-]/g,'-').slice(0,96);
-    saveState(state); return state.deviceId;
-  }
-  async function request(endpoint, init = {}, token) {
-    const response = await fetch(`${baseUrl}${endpoint}`, {
-      ...init,
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json', ...(init.headers || {}) },
-      signal: AbortSignal.timeout(35000),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-    return data;
-  }
-  async function enroll(enrollmentToken, label) {
-    const state = loadState(); const deviceId = ensureDeviceId(state);
-    const data = await request('/api/companion/enroll', { method:'POST', body:JSON.stringify({ enrollmentToken, deviceId, label: label || os.hostname(), platform: process.platform, agentVersion:'desktop-0.1.0' }) });
-    if (!data.companionToken) throw new Error('Enrollment did not return a companion credential.');
-    state.companionToken = data.companionToken; state.principalId = data.principal?.id; state.label = data.device?.label || label || os.hostname(); state.enrolledAt = new Date().toISOString();
-    saveState(state); return status();
-  }
-  async function tick() {
-    const state = loadState(); const deviceId = ensureDeviceId(state);
-    if (!state.companionToken) return;
-    lastPollAt = new Date().toISOString();
-    const data = await request(`/api/device-agent?deviceId=${encodeURIComponent(deviceId)}`, {}, state.companionToken);
-    for (const command of data.commands || []) {
-      let ok=false,result=''; try { result=await executeLocal(command);ok=true; } catch(error){ result=error instanceof Error?error.message:'Device command failed.'; }
-      await request('/api/device-agent', { method:'POST', body:JSON.stringify({ commandId:command.id, deviceId, ok, result }) }, state.companionToken);
-    }
-    lastError = '';
-  }
-  function start(intervalMs = 15000) {
-    if (running) return; running=true;
-    const loop = async()=>{ try{await tick();}catch(error){lastError=error instanceof Error?error.message:String(error);} if(running)timer=setTimeout(loop,Math.max(5000,intervalMs));}; void loop();
-  }
-  function stop(){running=false;if(timer)clearTimeout(timer);timer=null;}
-  function signOut(){stop();const state=loadState();delete state.companionToken;delete state.principalId;saveState(state);}
-  function status(){const state=loadState();return {baseUrl,deviceId:ensureDeviceId(state),label:state.label||os.hostname(),principalId:state.principalId||null,enrolled:Boolean(state.companionToken),running,lastPollAt,lastError};}
-  return { enroll, start, stop, signOut, status };
-}
-
-module.exports = { createAgent, executeLocal, safeBaseUrl };
+module.exports={createAgent,executeLocal,safeBaseUrl};
