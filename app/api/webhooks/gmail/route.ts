@@ -1,0 +1,8 @@
+import { timingSafeEqual } from 'node:crypto';
+import { NextResponse } from 'next/server';
+import { runCommunicationsSync } from '@/lib/communications-sync';
+import { recordInboundEvent } from '@/lib/event-fabric';
+import { getOwnerProfileId } from '@/lib/owner';
+export const runtime='nodejs'; export const maxDuration=120;
+function safeEqual(a:string,b:string){const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);}
+export async function POST(request:Request){const secret=process.env.ELP_GMAIL_PUSH_TOKEN?.trim();if(!secret)return NextResponse.json({error:'Gmail push ingress is not configured.'},{status:503});const url=new URL(request.url);const supplied=request.headers.get('x-elp-push-token')||url.searchParams.get('token')||'';if(!safeEqual(secret,supplied))return NextResponse.json({error:'Unauthorized Gmail push.'},{status:401});const body=await request.json().catch(()=>null) as {message?:{data?:string;messageId?:string}}|null;const profileId=getOwnerProfileId();if(!profileId)return NextResponse.json({error:'ELP owner profile is unavailable.'},{status:503});let metadata:Record<string,unknown>={};try{if(body?.message?.data)metadata=JSON.parse(Buffer.from(body.message.data,'base64').toString('utf8')) as Record<string,unknown>;}catch{}await recordInboundEvent(profileId,{provider:'gmail',type:'native_push',sourceId:body?.message?.messageId,summary:'Gmail native push notification received.',metadata});void runCommunicationsSync({profileId,persist:true}).catch((error)=>console.error('ELP Gmail push delta sync failed',error));return NextResponse.json({ok:true});}
