@@ -4,6 +4,7 @@ import { hasCapability, requiredApprovalCapability } from '@/lib/authority-polic
 import { listActivePasskeys } from '@/lib/passkey-memory';
 import { validatePrincipalSession } from '@/lib/principal-sessions';
 import { createActionToken, sanitizeId, verifyActionToken, verifyPrincipalStepUpToken } from '@/lib/security';
+import { recordSecurityEventSafe } from '@/lib/security-audit';
 import { resolveZeroTrustAuthority } from '@/lib/zero-trust-authority';
 
 export const runtime = 'nodejs';
@@ -62,6 +63,18 @@ export async function POST(request: Request) {
     await recordActionApproved(context.profileId, proposal.nonce);
   } catch (error) {
     console.error('ELP approval audit failed', error);
+  }
+  if (proposal.risk === 'high') {
+    await recordSecurityEventSafe(context.profileId, {
+      category: 'action',
+      action: 'action.high_risk_approved',
+      outcome: 'success',
+      severity: 'high',
+      actorPrincipalId: context.principal.id,
+      sessionId: context.session?.id,
+      subjectId: proposal.nonce,
+      detail: proposal.digest,
+    });
   }
 
   return NextResponse.json({

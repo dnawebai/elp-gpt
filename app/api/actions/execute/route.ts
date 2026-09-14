@@ -4,6 +4,7 @@ import { recordActionExecuted, recordActionExecuting, recordActionFailed } from 
 import { hasCapability, requiredApprovalCapability } from '@/lib/authority-policy';
 import { executeComposioTool, isComposioConfigured } from '@/lib/composio';
 import { sanitizeId, verifyActionToken } from '@/lib/security';
+import { recordSecurityEventSafe } from '@/lib/security-audit';
 import { resolveZeroTrustAuthority } from '@/lib/zero-trust-authority';
 
 export const runtime = 'nodejs';
@@ -84,6 +85,18 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error('ELP execution-success audit failed', error);
     }
+    if (token.risk === 'high') {
+      await recordSecurityEventSafe(context.profileId, {
+        category: 'action',
+        action: 'action.high_risk_executed',
+        outcome: 'success',
+        severity: 'high',
+        actorPrincipalId: context.principal.id,
+        subjectId: token.nonce,
+        sessionId: context.session?.id,
+        detail: toolSlug,
+      });
+    }
     return NextResponse.json({ ok: true, toolSlug, risk: token.risk, executedByPrincipalId: context.principal.id, result }, {
       headers: { 'Cache-Control': 'no-store, private' },
     });
@@ -94,6 +107,18 @@ export async function POST(request: Request) {
       await recordActionFailed(context.profileId, token.nonce, message);
     } catch (auditError) {
       console.error('ELP execution-failure audit failed', auditError);
+    }
+    if (token.risk === 'high') {
+      await recordSecurityEventSafe(context.profileId, {
+        category: 'action',
+        action: 'action.high_risk_failed',
+        outcome: 'failure',
+        severity: 'critical',
+        actorPrincipalId: context.principal.id,
+        subjectId: token.nonce,
+        sessionId: context.session?.id,
+        detail: `${toolSlug}: ${message}`.slice(0, 900),
+      });
     }
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
