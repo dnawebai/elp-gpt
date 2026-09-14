@@ -1,6 +1,6 @@
 import { getElpOwnerAccountBindings } from '@/lib/elp-config';
 
-const DEFAULT_BASE_URL = 'https://backend.composio.dev/api/v3.1';
+const DEFAULT_CONNECTIONS_BASE_URL = 'https://backend.composio.dev/api/v3';
 
 export type ConnectionStatus = 'ACTIVE' | 'INITIALIZING' | 'INITIATED' | 'FAILED' | 'EXPIRED' | 'INACTIVE' | string;
 export type ConnectionRisk = 'read' | 'write' | 'high';
@@ -47,7 +47,7 @@ export const CONNECTION_POLICIES: readonly ConnectionPolicy[] = [
 function config() {
   return {
     apiKey: process.env.COMPOSIO_API_KEY?.trim(),
-    baseUrl: (process.env.COMPOSIO_API_URL || DEFAULT_BASE_URL).replace(/\/$/, ''),
+    baseUrl: (process.env.COMPOSIO_CONNECTIONS_API_URL || DEFAULT_CONNECTIONS_BASE_URL).replace(/\/$/, ''),
   };
 }
 
