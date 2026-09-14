@@ -1,29 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isCronRequestAuthorised } from '@/lib/cron-auth';
 import { getOwnerProfileId } from '@/lib/owner';
+import { applySecurityAutomation } from '@/lib/security-automation';
 import { assessSecurityOperations } from '@/lib/security-operations';
-
-export const runtime = 'nodejs';
-export const maxDuration = 300;
-
-export async function GET(request: Request) {
-  if (!isCronRequestAuthorised(request)) return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
-  const profileId = getOwnerProfileId();
-  if (!profileId) return NextResponse.json({ ok: false, error: 'Security monitoring requires ELP single-user mode.' }, { status: 503 });
-  try {
-    const snapshot = await assessSecurityOperations(profileId, { persistIncidents: true, notify: true });
-    return NextResponse.json({
-      ok: true,
-      generatedAt: snapshot.generatedAt,
-      posture: snapshot.posture,
-      integrityOk: snapshot.integrity.ok,
-      findings: snapshot.findings.length,
-      openIncidents: snapshot.stats.openIncidents,
-      activeSessions: snapshot.stats.activeSessions,
-      recentDeniedEvents: snapshot.stats.recentDeniedEvents,
-    }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (error) {
-    console.error('ELP security monitor cron failed', error);
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message.slice(0, 500) : 'Security monitoring failed.' }, { status: 503 });
-  }
-}
+export const runtime='nodejs'; export const maxDuration=300;
+export async function GET(request:Request){if(!isCronRequestAuthorised(request))return NextResponse.json({ok:false,error:'Unauthorized.'},{status:401});const profileId=getOwnerProfileId();if(!profileId)return NextResponse.json({ok:false,error:'Security monitoring requires ELP single-user mode.'},{status:503});try{const snapshot=await assessSecurityOperations(profileId,{persistIncidents:true,notify:true});const automation=await applySecurityAutomation(profileId,snapshot,'principal-owner');return NextResponse.json({ok:true,generatedAt:snapshot.generatedAt,posture:snapshot.posture,integrityOk:snapshot.integrity.ok,findings:snapshot.findings.length,openIncidents:snapshot.stats.openIncidents,activeSessions:snapshot.stats.activeSessions,recentDeniedEvents:snapshot.stats.recentDeniedEvents,automaticResponses:automation.executed},{headers:{'Cache-Control':'no-store'}});}catch(error){console.error('ELP security monitor cron failed',error);return NextResponse.json({ok:false,error:error instanceof Error?error.message.slice(0,500):'Security monitoring failed.'},{status:503});}}
