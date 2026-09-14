@@ -1,28 +1,25 @@
 import { NextResponse } from 'next/server';
 import { createTask, getTaskBoard, updateTask, type TaskApproval, type TaskOwner, type TaskPriority, type TaskQueue, type TaskStatus } from '@/lib/task-router';
-import { PROFILE_COOKIE, verifyProfileToken } from '@/lib/security';
+import { requireZeroTrustAuthority } from '@/lib/zero-trust-authority';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-function readProfile(request: Request) {
-  const value = (request.headers.get('cookie') || '').split(';').map((part) => part.trim()).find((part) => part.startsWith(`${PROFILE_COOKIE}=`))?.slice(PROFILE_COOKIE.length + 1);
-  return verifyProfileToken(value);
-}
-
 export async function GET(request: Request) {
-  const profile = readProfile(request); if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
-  return NextResponse.json(await getTaskBoard(profile.profileId), { headers: { 'Cache-Control': 'no-store, private' } });
+  const context = await requireZeroTrustAuthority(request, 'read_context');
+  if (!context) return NextResponse.json({ error: 'Authorized principal session is required.' }, { status: 401 });
+  return NextResponse.json(await getTaskBoard(context.profileId), { headers: { 'Cache-Control': 'no-store, private' } });
 }
 
 export async function POST(request: Request) {
   try {
-    const profile = readProfile(request); if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
+    const context = await requireZeroTrustAuthority(request, 'manage_tasks');
+    if (!context) return NextResponse.json({ error: 'Task-management permission is required.' }, { status: 403 });
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const objective = typeof body?.objective === 'string' ? body.objective.trim() : '';
     if (!objective) return NextResponse.json({ error: 'objective is required.' }, { status: 400 });
     if (objective.length > 4000) return NextResponse.json({ error: 'objective is too long.' }, { status: 413 });
-    const id = await createTask(profile.profileId, {
+    const id = await createTask(context.profileId, {
       objective,
       queue: body?.queue as TaskQueue | undefined,
       owner: body?.owner as TaskOwner | undefined,
@@ -36,7 +33,7 @@ export async function POST(request: Request) {
       dueAt: typeof body?.dueAt === 'string' ? body.dueAt : undefined,
       progressEvidence: typeof body?.progressEvidence === 'string' ? body.progressEvidence : undefined,
     });
-    return NextResponse.json({ ok: true, id }, { status: 201 });
+    return NextResponse.json({ ok: true, id, principalId: context.principal.id }, { status: 201 });
   } catch (error) {
     console.error('Task creation failed', error);
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Task creation failed.' }, { status: 500 });
@@ -45,11 +42,12 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const profile = readProfile(request); if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
+    const context = await requireZeroTrustAuthority(request, 'manage_tasks');
+    if (!context) return NextResponse.json({ error: 'Task-management permission is required.' }, { status: 403 });
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const id = typeof body?.id === 'string' ? body.id.trim() : '';
     if (!id) return NextResponse.json({ error: 'id is required.' }, { status: 400 });
-    await updateTask(profile.profileId, id, {
+    await updateTask(context.profileId, id, {
       queue: body?.queue as TaskQueue | undefined,
       owner: body?.owner as TaskOwner | undefined,
       priority: body?.priority as TaskPriority | undefined,
@@ -68,7 +66,7 @@ export async function PATCH(request: Request) {
       completedAt: body?.completedAt as string | null | undefined,
       progressEvidence: body?.progressEvidence as string | null | undefined,
     });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, principalId: context.principal.id });
   } catch (error) {
     console.error('Task update failed', error);
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Task update failed.' }, { status: 500 });
