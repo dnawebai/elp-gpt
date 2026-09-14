@@ -110,7 +110,9 @@ export async function evaluateStandingAuthority(args: { profileId: string; princ
     const amount = amountFromArgs(args.arguments); if (p.maxAmount !== undefined && amount !== null && amount > p.maxAmount) continue;
     const h = await sessionFor(args.profileId); if (!h) continue;
     const messages = await listHonchoMessages(h.session, { pageSize: 100, maxPages: 10, reverse: true });
-    const day = new Date().toISOString().slice(0,10); const used = messages.map(parseUsage).filter((u): u is Usage => Boolean(u) && u.policyId===p.id && u.createdAt.startsWith(day)).length;
+    const day = new Date().toISOString().slice(0,10);
+    const usages = messages.map(parseUsage).filter((u): u is Usage => u !== null);
+    const used = usages.filter((u) => u.policyId === p.id && u.createdAt.startsWith(day)).length;
     if (used >= p.maxActionsPerDay) continue;
     return { allowed: true, reason: `Authorized by standing policy ${p.name}.`, policy: p };
   }
