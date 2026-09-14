@@ -19,14 +19,25 @@ type PrincipalSessionClaims = {
   assurance: PrincipalSessionAssurance;
   exp: number;
 };
+export type PrincipalStepUpPurpose = 'high-risk-approval' | 'authority-management';
 type PrincipalStepUpClaims = {
   kind: 'principal-step-up';
   profileId: string;
   principalId: string;
   sessionId: string;
   tokenVersion: string;
-  purpose: 'high-risk-approval' | 'authority-management';
+  purpose: PrincipalStepUpPurpose;
   nonce: string;
+  exp: number;
+};
+type PasskeyChallengeClaims = {
+  kind: 'passkey-challenge';
+  profileId: string;
+  principalId: string;
+  ceremony: 'register' | 'authenticate';
+  challenge: string;
+  sessionId?: string;
+  purpose?: PrincipalStepUpPurpose;
   exp: number;
 };
 type CompanionEnrollmentClaims = { kind: 'companion-enrollment'; profileId: string; principalId: string; enrollmentId: string; nonce: string; exp: number };
@@ -134,7 +145,7 @@ export function createPrincipalStepUpToken(input: {
   principalId: string;
   sessionId: string;
   tokenVersion: string;
-  purpose: PrincipalStepUpClaims['purpose'];
+  purpose: PrincipalStepUpPurpose;
   ttlSeconds?: number;
 }) {
   return mint<PrincipalStepUpClaims>({
@@ -157,6 +168,40 @@ export function verifyPrincipalStepUpToken(token: string | undefined) {
     !isSafeId(claims.sessionId) || !isSafeId(claims.tokenVersion) ||
     !isSafeId(claims.nonce) ||
     !['high-risk-approval','authority-management'].includes(claims.purpose)
+  ) return null;
+  return claims;
+}
+
+export function createPasskeyChallengeToken(input: {
+  profileId: string;
+  principalId: string;
+  ceremony: 'register' | 'authenticate';
+  challenge: string;
+  sessionId?: string;
+  purpose?: PrincipalStepUpPurpose;
+  ttlSeconds?: number;
+}) {
+  return mint<PasskeyChallengeClaims>({
+    kind: 'passkey-challenge',
+    profileId: input.profileId,
+    principalId: input.principalId,
+    ceremony: input.ceremony,
+    challenge: input.challenge,
+    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+    ...(input.purpose ? { purpose: input.purpose } : {}),
+    exp: Math.floor(Date.now() / 1000) + Math.max(60, Math.min(input.ttlSeconds || 300, 600)),
+  });
+}
+
+export function verifyPasskeyChallengeToken(token: string | undefined) {
+  const claims = verify<PasskeyChallengeClaims>(token);
+  if (
+    !claims || claims.kind !== 'passkey-challenge' ||
+    !isSafeId(claims.profileId) || !isSafeId(claims.principalId) ||
+    !['register','authenticate'].includes(claims.ceremony) ||
+    !/^[A-Za-z0-9_-]{20,512}$/.test(claims.challenge) ||
+    (claims.sessionId !== undefined && !isSafeId(claims.sessionId)) ||
+    (claims.purpose !== undefined && !['high-risk-approval','authority-management'].includes(claims.purpose))
   ) return null;
   return claims;
 }
