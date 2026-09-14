@@ -3,8 +3,8 @@ import { actionDigest, normalizeToolSlug, sanitizeActionArguments } from '@/lib/
 import { recordActionExecuted, recordActionExecuting, recordActionFailed } from '@/lib/approval-ledger';
 import { hasCapability, requiredApprovalCapability } from '@/lib/authority-policy';
 import { executeComposioTool, isComposioConfigured } from '@/lib/composio';
-import { resolveAuthorityContext } from '@/lib/principal-authority';
 import { sanitizeId, verifyActionToken } from '@/lib/security';
+import { resolveZeroTrustAuthority } from '@/lib/zero-trust-authority';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -19,8 +19,8 @@ function evidencePreview(value: unknown) {
 }
 
 export async function POST(request: Request) {
-  const context = await resolveAuthorityContext(request);
-  if (!context) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
+  const context = await resolveZeroTrustAuthority(request);
+  if (!context) return NextResponse.json({ error: 'Identity not established or delegated session revoked.' }, { status: 401 });
   if (!isComposioConfigured()) return NextResponse.json({ error: 'Composio is not configured.' }, { status: 503 });
 
   const body = (await request.json().catch(() => null)) as {
