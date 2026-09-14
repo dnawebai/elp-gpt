@@ -1,0 +1,24 @@
+{
+  "name": "elp-desktop-companion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ELP zero-trust desktop companion",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^37.3.1",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "ai.elpgpt.companion",
+    "productName": "ELP Companion",
+    "asar": true,
+    "files": ["main.cjs", "agent.cjs", "preload.cjs", "renderer.html", "renderer.js"],
+    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.productivity" },
+    "win": { "target": ["nsis", "portable"] },
+    "linux": { "target": ["AppImage"] }
+  }
+}
