@@ -8,7 +8,7 @@ function targetPurpose(url: string): PasskeyStepUpPurpose | null {
     const parsed = new URL(url, window.location.origin);
     if (parsed.origin !== window.location.origin) return null;
     if (parsed.pathname === '/api/actions/approve') return 'high-risk-approval';
-    if (parsed.pathname === '/api/authority-control' || parsed.pathname === '/api/passkeys') return 'authority-management';
+    if (parsed.pathname === '/api/authority-control' || parsed.pathname === '/api/passkeys' || parsed.pathname === '/api/security-operations') return 'authority-management';
     return null;
   } catch { return null; }
 }
