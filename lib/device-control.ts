@@ -2,10 +2,10 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { Honcho } from '@honcho-ai/sdk';
 import { listHonchoMessages } from '@/lib/honcho-pagination';
 
-export type DeviceCommandType = 'focus_on'|'focus_off'|'open_url'|'open_app'|'lock_screen'|'screenshot'|'clipboard_read'|'clipboard_write'|'file_list'|'file_read'|'file_write'|'notify'|'browser_open'|'type_text'|'key_press'|'mouse_click'|'run_process';
+export type DeviceCommandType = 'focus_on'|'focus_off'|'open_url'|'open_app'|'lock_screen'|'screenshot'|'screen_describe'|'clipboard_read'|'clipboard_write'|'file_list'|'file_read'|'file_write'|'notify'|'browser_open'|'type_text'|'key_press'|'mouse_click'|'run_process';
 export type DeviceCommandStatus='pending'|'claimed'|'completed'|'failed'|'cancelled';
 export type DeviceCommand={id:string;type:DeviceCommandType;target?:string;status:DeviceCommandStatus;requestedAt:string;updatedAt:string;claimedAt?:string;completedAt?:string;result?:string;deviceId?:string;targetDeviceId?:string;requestedByPrincipalId?:string;};
-export const DEVICE_COMMAND_TYPES:readonly DeviceCommandType[]=['focus_on','focus_off','open_url','open_app','lock_screen','screenshot','clipboard_read','clipboard_write','file_list','file_read','file_write','notify','browser_open','type_text','key_press','mouse_click','run_process'];
+export const DEVICE_COMMAND_TYPES:readonly DeviceCommandType[]=['focus_on','focus_off','open_url','open_app','lock_screen','screenshot','screen_describe','clipboard_read','clipboard_write','file_list','file_read','file_write','notify','browser_open','type_text','key_press','mouse_click','run_process'];
 const TYPES=new Set<DeviceCommandType>(DEVICE_COMMAND_TYPES);
 function workspaceId(){return process.env.HONCHO_WORKSPACE_ID||'elp-gpt';}
 async function sessionFor(profileId:string){if(!process.env.HONCHO_API_KEY)return null;const h=new Honcho({apiKey:process.env.HONCHO_API_KEY,workspaceId:workspaceId(),environment:'production'});const user=await h.peer(`user-${profileId}`);const elp=await h.peer('elp');const session=await h.session(`device-control-${profileId}`);await session.addPeers([user,elp]);return{user,elp,session};}
