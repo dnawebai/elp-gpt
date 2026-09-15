@@ -1,7 +1,14 @@
 import { ELP_SKILLS, type ElpSkill } from '@/lib/skills';
 import { HERMES_TRADING_SKILLS } from '@/lib/trading-skills';
+import { HERMES_CREATIVE_SKILLS } from '@/lib/creative-skills';
+import { AGENT_PLATFORM_SKILLS } from '@/lib/agent-platform-skills';
 
-export const ALL_ELP_SKILLS: readonly ElpSkill[] = [...ELP_SKILLS, ...HERMES_TRADING_SKILLS];
+export const ALL_ELP_SKILLS: readonly ElpSkill[] = [
+  ...ELP_SKILLS,
+  ...HERMES_TRADING_SKILLS,
+  ...HERMES_CREATIVE_SKILLS,
+  ...AGENT_PLATFORM_SKILLS,
+];
 
 function normalize(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9@.+-]+/g, ' ').replace(/\s+/g, ' ').trim();
