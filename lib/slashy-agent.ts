@@ -1,4 +1,4 @@
-import { getReasoningProviders } from '@/lib/elp';
+import { getReasoningProviders } from '@/lib/reasoning-providers';
 import { getMemorySnapshot, memoryToPrompt } from '@/lib/memory';
 import { getCommunicationsSyncSnapshot, runCommunicationsSync } from '@/lib/communications-sync';
 import { getCommitmentFulfilmentSnapshot } from '@/lib/commitment-fulfilment';
