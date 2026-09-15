@@ -1,5 +1,5 @@
 import { executeComposioTool, isComposioConfigured, searchComposioTools } from '@/lib/composio';
-import { getReasoningProviders } from '@/lib/elp';
+import { getReasoningProviders } from '@/lib/reasoning-providers';
 import { HERMES_CREATIVE_SKILLS } from '@/lib/creative-skills';
 
 export type SeniorHermesAgentRole =
