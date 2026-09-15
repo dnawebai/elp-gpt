@@ -84,3 +84,12 @@ export function listProjectAttachments() {
 export function getProjectAttachment(company: CompanyId) {
   return companyRequest(`/v1/projects/${encodeURIComponent(company)}/attachment`);
 }
+
+export function getProjectStatus(company: CompanyId) {
+  return companyRequest(`/v1/projects/${encodeURIComponent(company)}/status`);
+}
+
+export function listCompanySchedules(company?: CompanyId) {
+  const query = company ? `?company=${encodeURIComponent(company)}` : '';
+  return companyRequest(`/v1/schedules${query}`);
+}
