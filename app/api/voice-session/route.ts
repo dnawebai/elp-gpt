@@ -51,7 +51,10 @@ export async function POST(request: Request) {
   if (provider) {
     response.token = createVoiceGatewayToken(profile.profileId, sessionId);
     response.thinkEndpoint = `${origin}/api/voice/think`;
-    response.model = 'elp-router';
+    // Deepgram validates the OpenAI-compatible provider model during Settings.
+    // Keep a supported model id here even though our gateway internally routes
+    // the request to Hermes/Together and replaces the upstream model itself.
+    response.model = config.managedThinkModel;
   } else {
     response.model = config.managedThinkModel;
   }
