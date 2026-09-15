@@ -1,4 +1,5 @@
 import { runUnifiedAgentSwarm, type UnifiedSwarmResult } from '@/lib/agent-swarm';
+import { evolutionSelectionBias, getAgentEvolutionSnapshot, recordSwarmEvolution } from '@/lib/agent-evolution';
 import { getExecutiveLedger } from '@/lib/executive-memory';
 import { getReasoningProviders } from '@/lib/reasoning-providers';
 import { getRepositoryRadarSnapshot, repositoryRadarToPrompt } from '@/lib/repository-radar';
@@ -14,6 +15,11 @@ export type CognitiveLens = {
 export type AgiCoreResult = UnifiedSwarmResult & {
   cognitiveLenses: CognitiveLens[];
   verifier: { provider: string; latencyMs: number };
+  evolution: {
+    configured: boolean;
+    priorProfiles: number;
+    recordedObservations: number;
+  };
 };
 
 const LENSES: Array<Pick<CognitiveLens, 'id' | 'name'> & { mission: string }> = [
@@ -99,9 +105,10 @@ export async function runAgiCore(args: {
   const objective = clip(args.objective, 3000);
   if (!objective) throw new Error('ELP AGI Core objective is required.');
 
-  const [anchors, repositoryRadar] = await Promise.all([
+  const [anchors, repositoryRadar, evolutionSnapshot] = await Promise.all([
     memoryAnchors(args.profileId),
     getRepositoryRadarSnapshot(args.profileId),
+    getAgentEvolutionSnapshot(args.profileId),
   ]);
   const radarContext = repositoryRadarToPrompt(repositoryRadar);
   const baseContext = [
@@ -124,6 +131,7 @@ export async function runAgiCore(args: {
     objective,
     context: [baseContext, `ELP COGNITIVE LENSES:\n${lensContext}`].filter(Boolean).join('\n\n'),
     maxAgents: args.maxAgents ?? 8,
+    agentSelectionBias: evolutionSelectionBias(evolutionSnapshot),
   });
 
   const verified = await callReasoner(
@@ -132,10 +140,21 @@ export async function runAgiCore(args: {
     1900,
   );
 
+  const evolutionRecord = await recordSwarmEvolution(args.profileId, {
+    objective,
+    findings: swarm.findings,
+    generatedAt: swarm.generatedAt,
+  }).catch(() => ({ recorded: 0 }));
+
   return {
     ...swarm,
     synthesis: verified.text,
     cognitiveLenses,
     verifier: { provider: verified.provider, latencyMs: verified.latencyMs },
+    evolution: {
+      configured: evolutionSnapshot.configured,
+      priorProfiles: evolutionSnapshot.ranked.length,
+      recordedObservations: evolutionRecord.recorded,
+    },
   };
 }

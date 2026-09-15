@@ -173,20 +173,23 @@ function normalize(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function chooseAgents(objective: string, context: string, requestedMax?: number) {
+function chooseAgents(objective: string, context: string, requestedMax?: number, agentSelectionBias: Record<string, number> = {}) {
   const text = normalize(`${objective} ${context}`);
   const maxAgents = Math.max(MIN_AGENTS, Math.min(Number(requestedMax) || 6, MAX_AGENTS));
   const mandatory = new Set(['chief-strategist', 'market-intelligence', 'operations-chief']);
-  return ELP_SWARM_AGENTS
-    .map((agent) => {
-      let score = mandatory.has(agent.id) ? 8 : 0;
-      if (text.includes(agent.domain)) score += 6;
-      for (const keyword of agent.keywords) if (text.includes(normalize(keyword))) score += keyword.includes(' ') ? 5 : 3;
-      return { agent, score };
-    })
-    .sort((a, b) => b.score - a.score || a.agent.name.localeCompare(b.agent.name))
-    .slice(0, maxAgents)
-    .map((entry) => entry.agent);
+  const scored = ELP_SWARM_AGENTS.map((agent) => {
+    let score = mandatory.has(agent.id) ? 8 : 0;
+    if (text.includes(agent.domain)) score += 6;
+    for (const keyword of agent.keywords) if (text.includes(normalize(keyword))) score += keyword.includes(' ') ? 5 : 3;
+    const measuredBias = Number(agentSelectionBias[agent.id]);
+    if (Number.isFinite(measuredBias)) score += Math.max(-100, Math.min(10, measuredBias));
+    return { agent, score, measuredBias: Number.isFinite(measuredBias) ? measuredBias : 0 };
+  });
+  const core = scored.filter((entry) => mandatory.has(entry.agent.id));
+  const specialists = scored
+    .filter((entry) => !mandatory.has(entry.agent.id) && entry.measuredBias > -50)
+    .sort((a, b) => b.score - a.score || a.agent.name.localeCompare(b.agent.name));
+  return [...core, ...specialists.slice(0, Math.max(0, maxAgents - core.length))].map((entry) => entry.agent);
 }
 
 async function callReasoner(system: string, user: string, maxTokens = 1100) {
@@ -297,12 +300,13 @@ export async function runUnifiedAgentSwarm(args: {
   objective: string;
   context?: string;
   maxAgents?: number;
+  agentSelectionBias?: Record<string, number>;
 }): Promise<UnifiedSwarmResult> {
   const objective = clean(args.objective, 3000);
   const context = clean(args.context, 6000);
   if (!objective) throw new Error('Serious Mode objective is required.');
 
-  const agents = chooseAgents(objective, context, args.maxAgents);
+  const agents = chooseAgents(objective, context, args.maxAgents, args.agentSelectionBias);
   const relevantSkills = matchAllSkills(objective, 10).map((skill) => `${skill.name} [${skill.risk}]`);
   const sharedContext = [
     `OBJECTIVE:\n${objective}`,
