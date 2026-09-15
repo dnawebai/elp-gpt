@@ -18,7 +18,9 @@ test('Slashy and Vellum require explicit or strong intent signals', () => {
   assert.match(router, /use\|ask\|run/);
   assert.match(router, /dropped balls/);
   assert.match(router, /evaluate/);
-  assert.doesNotMatch(router, /return 'slashy';\s*$/m);
+  assert.match(router, /if \(slashySignals\.some/);
+  assert.match(router, /if \(vellumSignals\.some/);
+  assert.match(router, /return null;/);
 });
 
 test('Vellum continues to block write and high-risk tool nodes', () => {
