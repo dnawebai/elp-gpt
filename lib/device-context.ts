@@ -4,6 +4,12 @@ export type ElpDeviceContext = {
   locale?: string;
   online?: boolean;
   userAgent?: string;
+  platform?: string;
+  osVersion?: string;
+  modelName?: string;
+  deviceName?: string;
+  appState?: 'active' | 'background' | 'inactive' | 'unknown';
+  appVersion?: string;
   location?: {
     latitude: number;
     longitude: number;
@@ -14,16 +20,39 @@ export type ElpDeviceContext = {
   };
 };
 
+function cleanString(value: unknown, max: number) {
+  if (typeof value !== 'string') return undefined;
+  const clean = value.trim();
+  return clean ? clean.slice(0, max) : undefined;
+}
+
 export function sanitizeDeviceContext(value: unknown): ElpDeviceContext | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const input = value as Record<string, unknown>;
   const capturedAt = typeof input.capturedAt === 'string' ? input.capturedAt.slice(0, 64) : new Date().toISOString();
   const result: ElpDeviceContext = { capturedAt };
 
-  if (typeof input.timezone === 'string' && input.timezone.length <= 80) result.timezone = input.timezone;
-  if (typeof input.locale === 'string' && input.locale.length <= 40) result.locale = input.locale;
+  const timezone = cleanString(input.timezone, 80);
+  const locale = cleanString(input.locale, 40);
+  const userAgent = cleanString(input.userAgent, 500);
+  const platform = cleanString(input.platform, 32);
+  const osVersion = cleanString(input.osVersion, 80);
+  const modelName = cleanString(input.modelName, 120);
+  const deviceName = cleanString(input.deviceName, 120);
+  const appVersion = cleanString(input.appVersion, 40);
+  const appState = cleanString(input.appState, 20);
+  if (timezone) result.timezone = timezone;
+  if (locale) result.locale = locale;
   if (typeof input.online === 'boolean') result.online = input.online;
-  if (typeof input.userAgent === 'string') result.userAgent = input.userAgent.slice(0, 500);
+  if (userAgent) result.userAgent = userAgent;
+  if (platform) result.platform = platform;
+  if (osVersion) result.osVersion = osVersion;
+  if (modelName) result.modelName = modelName;
+  if (deviceName) result.deviceName = deviceName;
+  if (appVersion) result.appVersion = appVersion;
+  result.appState = appState && ['active','background','inactive','unknown'].includes(appState)
+    ? appState as ElpDeviceContext['appState']
+    : 'unknown';
 
   const rawLocation = input.location;
   if (rawLocation && typeof rawLocation === 'object' && !Array.isArray(rawLocation)) {
@@ -60,6 +89,11 @@ export function deviceContextToPrompt(context: ElpDeviceContext | null) {
     `Captured: ${context.capturedAt}`,
     context.timezone ? `Timezone: ${context.timezone}` : '',
     context.locale ? `Locale: ${context.locale}` : '',
+    context.platform ? `Platform: ${context.platform}${context.osVersion ? ` ${context.osVersion}` : ''}` : '',
+    context.modelName ? `Device model: ${context.modelName}` : '',
+    context.deviceName ? `Device label: ${context.deviceName}` : '',
+    context.appVersion ? `Companion version: ${context.appVersion}` : '',
+    context.appState ? `Companion state: ${context.appState}` : '',
     typeof context.online === 'boolean' ? `Device online: ${context.online ? 'yes' : 'no'}` : '',
   ].filter(Boolean);
 
