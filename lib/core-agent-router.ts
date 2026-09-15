@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { runAgiCore } from '@/lib/agi-core';
+import { governedActionExecutionSummary, orchestrateAgentActions, summarizeGovernedAgentActions } from '@/lib/agent-action-orchestrator';
 import { persistAgentRun } from '@/lib/agent-run-memory';
 import { runSlashyMission } from '@/lib/slashy-agent';
 import { runVellumWorkflow, type VellumWorkflow } from '@/lib/vellum-agent';
+import type { ZeroTrustAuthorityContext } from '@/lib/zero-trust-authority';
 
 export type CoreAgentRouteResult =
   | { handled: false }
@@ -104,6 +106,7 @@ export async function routeCoreAgent(args: {
   profileId: string;
   sessionId: string;
   userText: string;
+  authorityContext?: ZeroTrustAuthorityContext | null;
 }): Promise<CoreAgentRouteResult> {
   const mode = detectMode(args.userText);
   if (!mode) return { handled: false };
@@ -144,13 +147,28 @@ export async function routeCoreAgent(args: {
 
   if (mode === 'serious') {
     const result = await runAgiCore({ profileId: args.profileId, objective, maxAgents: 8 });
+    const governedActions = args.authorityContext && result.actionIntents.length
+      ? await orchestrateAgentActions({
+          authority: args.authorityContext,
+          sessionId: args.sessionId,
+          objective,
+          intents: result.actionIntents,
+          autoExecuteRead: true,
+          autoExecuteStandingWrite: true,
+        })
+      : null;
+    const executionSummary = governedActionExecutionSummary(governedActions);
+    const authorityNotice = !args.authorityContext && result.actionIntents.length
+      ? 'Governed execution: action intents were identified, but an authenticated authority session is required before they can be planned or executed.'
+      : '';
+    const responseText = [result.synthesis, executionSummary || authorityNotice].filter(Boolean).join('\n\n');
     const runId = randomUUID();
     await persistAgentRun(args.profileId, {
       id: runId,
       mode: 'serious',
       objective,
       status: result.findings.some((finding) => finding.status === 'failed') ? 'completed-with-partial-agent-failures' : 'completed',
-      summary: result.synthesis,
+      summary: responseText,
       trace: result.trace,
       metadata: {
         agents: result.agents.map((agent) => ({ id: agent.id, name: agent.name, domain: agent.domain })),
@@ -158,6 +176,8 @@ export async function routeCoreAgent(args: {
         verifier: result.verifier,
         relevantSkills: result.relevantSkills,
         skillCandidates: result.skillCandidates,
+        actionIntents: result.actionIntents,
+        governedActions: summarizeGovernedAgentActions(governedActions),
         failedAgents: result.findings.filter((finding) => finding.status === 'failed').map((finding) => finding.agentId),
       },
       generatedAt: result.generatedAt,
@@ -165,7 +185,7 @@ export async function routeCoreAgent(args: {
     return {
       handled: true,
       mode: 'serious',
-      text: result.synthesis,
+      text: responseText,
       metadata: {
         runId,
         agentCount: result.agents.length + result.cognitiveLenses.length + 2,
@@ -174,6 +194,8 @@ export async function routeCoreAgent(args: {
         completedAgents: result.findings.filter((finding) => finding.status === 'completed').length,
         failedAgents: result.findings.filter((finding) => finding.status === 'failed').length,
         skillCandidates: result.skillCandidates,
+        actionIntents: result.actionIntents,
+        governedActions: governedActions || (result.actionIntents.length ? { identityRequired: true } : null),
       },
     };
   }
