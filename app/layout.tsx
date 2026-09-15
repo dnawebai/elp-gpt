@@ -7,19 +7,30 @@ import './retell-call.css';
 import './responsive-polish.css';
 import type { Metadata, Viewport } from 'next';
 import InstallAppPrompt from './InstallAppPrompt';
+import OwnerSessionGate from './OwnerSessionGate';
 import PasskeyStepUpBridge from './PasskeyStepUpBridge';
-import RetellCallDock from './RetellCallDock';
 import ServiceWorkerRegistration from './ServiceWorkerRegistration';
 
 const SITE_URL = 'https://elpgpt.com';
-const TITLE = 'ELP GPT — AI Voice Assistant & Operator';
-const DESCRIPTION = 'ELP GPT is a voice-first AI advisor and operator that can reason, remember context, work across connected tools, and execute permission-gated actions.';
+const TITLE = 'ELP GPT - AGI Evolution & Autonomous Intelligence';
+const DESCRIPTION = 'ELP GPT - AGI is an evolving private intelligence system designed to progress toward Artificial General Intelligence through multimodal reasoning, persistent memory, autonomous planning, connected tools, and permission-gated real-world execution.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
   applicationName: 'ELP GPT',
+  keywords: [
+    'ELP GPT',
+    'AGI',
+    'Artificial General Intelligence',
+    'AI agent',
+    'autonomous AI',
+    'AI operator',
+    'voice AI',
+    'multimodal AI',
+    'personal intelligence system',
+  ],
   alternates: { canonical: '/' },
   robots: {
     index: true,
@@ -41,9 +52,12 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   icons: {
     icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/icon-192.svg', sizes: '192x192', type: 'image/svg+xml' },
       { url: '/icon-512.svg', sizes: '512x512', type: 'image/svg+xml' },
     ],
+    shortcut: '/favicon.svg',
+    apple: '/icon-192.svg',
   },
   appleWebApp: {
     capable: true,
@@ -64,17 +78,18 @@ const webAppSchema = {
   '@type': 'WebApplication',
   '@id': `${SITE_URL}/#app`,
   name: 'ELP GPT',
-  alternateName: ['ELP GPT', 'ELP AI'],
+  alternateName: ['ELP GPT - AGI', 'ELP AI'],
   url: SITE_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
   description: DESCRIPTION,
   featureList: [
-    'Voice-first AI interaction',
+    'Voice-first multimodal AI interaction',
+    'Persistent contextual memory',
+    'Autonomous planning and reasoning',
     'Connected-tool actions',
-    'Permission-gated execution',
-    'Long-term contextual memory',
-    'AI operator workflows',
+    'Permission-gated real-world execution',
+    'Continuous evolution toward broader general intelligence',
   ],
 };
 
@@ -88,8 +103,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         />
         <ServiceWorkerRegistration />
         <PasskeyStepUpBridge />
+        <OwnerSessionGate />
         {children}
-        <RetellCallDock />
         <InstallAppPrompt />
       </body>
     </html>
