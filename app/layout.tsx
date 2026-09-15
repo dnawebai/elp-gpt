@@ -8,6 +8,7 @@ import './responsive-polish.css';
 import './owner-session-gate.css';
 import './voice-presence.css';
 import type { Metadata, Viewport } from 'next';
+import ApprovalPresence from './ApprovalPresence';
 import InstallAppPrompt from './InstallAppPrompt';
 import OwnerSessionGate from './OwnerSessionGate';
 import PasskeyStepUpBridge from './PasskeyStepUpBridge';
@@ -109,6 +110,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ServiceWorkerRegistration />
         <PasskeyStepUpBridge />
         <OwnerSessionGate />
+        <ApprovalPresence />
         {children}
         <InstallAppPrompt />
       </body>
