@@ -30,16 +30,18 @@ export async function POST(request: Request) {
   try {
     const readiness = await getPhoneReadiness(context.profileId);
     const requestedFrom = typeof body.fromNumber === 'string' ? body.fromNumber.trim() : '';
-    const preferred = readiness.phoneNumbers.find((number) => number.number === requestedFrom && number.outboundAgentId)
-      || readiness.phoneNumbers.find((number) => Boolean(number.outboundAgentId));
-    const fromNumber = requestedFrom || preferred?.number || process.env.ELP_RETELL_FROM_NUMBER?.trim() || '';
+    const preferred = readiness.phoneNumbers.find(
+      (number) => number.number === requestedFrom && number.ready && number.outboundAgentId,
+    ) || readiness.phoneNumbers.find((number) => number.ready && Boolean(number.outboundAgentId));
+    const configuredFallback = process.env.ELP_RETELL_FROM_NUMBER?.trim() || '';
+    const fromNumber = preferred?.number || (!requestedFrom && readiness.available ? configuredFallback : '');
     const agentId = typeof body.agentId === 'string' && body.agentId.trim()
       ? body.agentId.trim()
       : preferred?.outboundAgentId;
 
-    if (!fromNumber) {
+    if (!readiness.available || !fromNumber) {
       return NextResponse.json(
-        { error: 'No outbound ELP caller ID is configured.' },
+        { error: 'ELP telephony is staged but not active. Complete the custom SIP trunk before placing outbound calls.' },
         { status: 503, headers: { 'Cache-Control': 'no-store, private' } },
       );
     }
