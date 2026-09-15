@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { refreshApprovalEscalations } from '@/lib/approval-escalation';
 import { isCronRequestAuthorised } from '@/lib/cron-auth';
 import { deliverMobilePriorityNotifications } from '@/lib/mobile-notification-delivery';
 import { deliverPriorityNotifications } from '@/lib/notification-delivery';
@@ -14,6 +15,7 @@ export async function GET(request: Request) {
   if (!profileId) return NextResponse.json({ ok: false, error: 'Autonomous notifications require ELP single-user mode.' }, { status: 503 });
   try {
     const result = await refreshNotifications(profileId);
+    const escalation = await refreshApprovalEscalations(profileId);
     const [delivery, mobile] = await Promise.all([
       deliverPriorityNotifications(profileId),
       deliverMobilePriorityNotifications(profileId),
@@ -25,6 +27,7 @@ export async function GET(request: Request) {
       unread: result.center.stats.unread,
       critical: result.center.stats.critical,
       high: result.center.stats.high,
+      approvalsEscalated: escalation.escalated,
       delivery: { attempted: delivery.attempted, sent: delivery.sent, failed: delivery.failed, channels: delivery.channels },
       mobile: { attempted: mobile.attempted, sent: mobile.sent, failed: mobile.failed },
     }, { headers: { 'Cache-Control': 'no-store' } });

@@ -48,6 +48,17 @@ type OperatorPendingVoiceAction = {
   postExecution?: VoicePostExecution;
 };
 
+type DurableApproval = {
+  id: string;
+  summary: string;
+  toolSlug: string;
+  risk: 'read' | 'write' | 'high';
+  status: 'pending' | 'executed' | 'rejected' | 'failed' | 'expired';
+  sourceRunId?: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
 const VOICE_PROMPT = `You are ELP, the voice-first intelligence system for ELP GPT.
 
 Relationship and voice manner:
@@ -69,6 +80,9 @@ For a post-meeting email request such as "send the first follow-up from yesterda
 For a calendar follow-up such as "schedule the follow-up call Tuesday at 2 PM", call jarbis_command with command="meeting_schedule", meeting set to the relevant meeting reference, scheduleRequest containing the user's date/time wording, durationMinutes if stated, and inviteParticipants=true unless the user explicitly says not to invite them. The server resolves relative dates against the browser timezone and returns an exact approval-required calendar action.
 When the user asks what ELP is doing about open obligations, what commitments need action, or what autonomous work is waiting, use command="fulfilment". When the user explicitly asks ELP to work through, advance, review, or fulfil open commitments now, use command="fulfilment_run". ELP may autonomously perform read-only research and internal preparation, but any external write returned by fulfilment remains approval-required. Describe only the single exact pending action being proposed and ask for approval.
 When the user asks what problems are coming, what may go wrong next, what the next seven days look like, or what ELP can prevent before it becomes urgent, use command="anticipatory". When the user explicitly asks to rescan, forecast, or look ahead now, use command="anticipatory_run". Present forecasts as evidence-backed early warnings with confidence, never as certainty.
+When the user asks about waiting approvals, use list_pending_approvals. Read back the numbered redacted list with summary, tool, risk, and expiry. Never expose sealed arguments or tokens.
+When the user explicitly approves a listed durable approval, call approve_pending_approval with its one-based index or continuation_id. Before calling it, identify the exact summary, tool, and risk being approved. Never infer approval from silence, context, or an earlier unrelated yes. High-risk actions may trigger a passkey challenge and are not complete until the execution result confirms success.
+When the user explicitly rejects a listed durable approval, call reject_pending_approval with its one-based index or continuation_id. Never substitute one pending approval for another if the queue changes; relist when selection is ambiguous.
 For external apps not covered by a native JARBIS command, first use search_tools to discover a suitable Composio tool, then use prepare_action with the exact slug and arguments.
 Read-only actions can run immediately when directly requested. Any write or consequential action must be prepared first and requires explicit user approval. Ask for approval plainly, then call approve_action only after the user clearly approves. If the user declines, call reject_action.
 Never claim an external action happened unless the tool result confirms it. Never reinterpret approval for changed arguments.
@@ -102,6 +116,9 @@ const UI_FUNCTIONS = [
       required: ['command'],
     },
   },
+  { name: 'list_pending_approvals', description: 'List durable AGI approvals waiting for the owner. Returns only redacted summaries, tool names, risk, and expiry.', parameters: { type: 'object', properties: {} } },
+  { name: 'approve_pending_approval', description: 'Approve and execute one durable pending approval only after the user explicitly gives spoken approval.', parameters: { type: 'object', properties: { continuation_id: { type: 'string' }, index: { type: 'number', description: 'One-based index from the latest pending approval list.' } } } },
+  { name: 'reject_pending_approval', description: 'Reject one durable pending approval only after the user explicitly gives spoken rejection.', parameters: { type: 'object', properties: { continuation_id: { type: 'string' }, index: { type: 'number', description: 'One-based index from the latest pending approval list.' } } } },
   { name: 'search_tools', description: 'Discover the best Composio tool for an external app task.', parameters: { type: 'object', properties: { query: { type: 'string' }, toolkit: { type: 'string' } }, required: ['query'] } },
   { name: 'prepare_action', description: 'Prepare an exact Composio execution. Read-only actions may run immediately; writes are held for approval.', parameters: { type: 'object', properties: { tool_slug: { type: 'string' }, arguments: { type: 'object', additionalProperties: true }, summary: { type: 'string' }, connected_account_id: { type: 'string' } }, required: ['tool_slug', 'arguments', 'summary'] } },
   { name: 'approve_action', description: 'Execute the currently pending write/consequential action after explicit approval.', parameters: { type: 'object', properties: {} } },
@@ -126,11 +143,20 @@ async function captureDeviceContext(includeLocation: boolean): Promise<ElpDevice
   });
 }
 
+function explicitApprovalLanguage(value: string) {
+  return /\b(approve|approved|yes|okay|ok|go ahead|proceed|do it|execute|authorise|authorize|confirmed|confirm)\b/i.test(value);
+}
+
+function explicitRejectionLanguage(value: string) {
+  return /\b(reject|decline|cancel|no|stop|do not|don't|dont|deny)\b/i.test(value);
+}
+
 export function useElpVoice({ enabled, sessionId, onMessage, onCommand, onError }: Options) {
   const sessionRef = useRef<AgentSession | null>(null);
   const micRef = useRef<AgentMicrophone | null>(null);
   const playerRef = useRef<AgentPlayer | null>(null);
   const lastTranscriptRef = useRef('');
+  const lastUserUtteranceRef = useRef<{ content: string; at: number } | null>(null);
   const operatorPendingRef = useRef<OperatorPendingVoiceAction | null>(null);
   const [state, setState] = useState<'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error'>('idle');
 
@@ -157,6 +183,55 @@ export function useElpVoice({ enabled, sessionId, onMessage, onCommand, onError 
     if (data.status === 'approval_required' && data.pendingAction) operatorPendingRef.current = data.pendingAction;
     return data;
   }, [sessionId]);
+
+  const listPendingApprovals = useCallback(async () => {
+    const response = await fetch('/api/approvals', { cache: 'no-store' });
+    const data = await response.json().catch(() => ({ error: 'Approval queue returned an invalid response.' })) as { error?: string; continuations?: DurableApproval[] };
+    if (!response.ok) return { ok: false, error: data.error || 'Approval queue unavailable.' };
+    const approvals = (data.continuations || [])
+      .filter((item) => item.status === 'pending')
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 8)
+      .map((item, index) => ({
+        index: index + 1,
+        continuationId: item.id,
+        summary: item.summary,
+        toolSlug: item.toolSlug,
+        risk: item.risk,
+        expiresAt: item.expiresAt,
+        ...(item.sourceRunId ? { sourceRunId: item.sourceRunId } : {}),
+      }));
+    return { ok: true, count: approvals.length, approvals };
+  }, []);
+
+  const continueDurableApproval = useCallback(async (input: Record<string, unknown>, action: 'approve' | 'reject') => {
+    const spoken = lastUserUtteranceRef.current;
+    const recent = spoken && Date.now() - spoken.at <= 25_000;
+    const explicit = recent && (action === 'approve' ? explicitApprovalLanguage(spoken.content) : explicitRejectionLanguage(spoken.content));
+    if (!explicit) {
+      return { ok: false, error: `Explicit spoken ${action === 'approve' ? 'approval' : 'rejection'} is required immediately before this action.` };
+    }
+
+    const listed = await listPendingApprovals();
+    if (!listed.ok) return listed;
+    const approvals = listed.approvals || [];
+    const continuationId = typeof input.continuation_id === 'string' ? input.continuation_id.trim() : '';
+    const index = typeof input.index === 'number' && Number.isInteger(input.index) ? input.index : 0;
+    const selected = continuationId
+      ? approvals.find((item) => item.continuationId === continuationId)
+      : index > 0 ? approvals[index - 1] : undefined;
+    if (!selected) return { ok: false, error: 'The requested pending approval is ambiguous or no longer available. List pending approvals again.' };
+
+    const response = await fetch('/api/approvals/continue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ continuationId: selected.continuationId, action }),
+      cache: 'no-store',
+    });
+    const data = await response.json().catch(() => ({ error: 'Approval continuation returned an invalid response.' })) as Record<string, unknown> & { error?: string };
+    if (!response.ok) return { ok: false, error: data.error || `Could not ${action} the selected approval.`, selected };
+    return { ok: true, selected, ...data };
+  }, [listPendingApprovals]);
 
   const recordPostExecution = useCallback(async (postExecution: VoicePostExecution | undefined, result: unknown) => {
     if (!postExecution) return;
@@ -207,6 +282,7 @@ export function useElpVoice({ enabled, sessionId, onMessage, onCommand, onError 
       session.on('conversation-text', (message) => {
         if ((message.role === 'user' || message.role === 'assistant') && message.content?.trim()) {
           const event = { role: message.role, content: message.content.trim() } as VoiceMessage;
+          if (event.role === 'user') lastUserUtteranceRef.current = { content: event.content, at: Date.now() };
           onMessage(event); persistMessage(event);
         }
       });
@@ -225,6 +301,9 @@ export function useElpVoice({ enabled, sessionId, onMessage, onCommand, onError 
               if (!query) result = { ok: false, error: 'A skill query is required.' };
               else { const response = await fetch(`/api/skills?q=${encodeURIComponent(query)}`, { cache: 'no-store' }); result = response.ok ? await response.json() : { ok: false, error: 'Skill discovery unavailable.' }; }
             } else if (fn.name === 'jarbis_command') result = await runJarbisVoiceCommand(input);
+            else if (fn.name === 'list_pending_approvals') result = await listPendingApprovals();
+            else if (fn.name === 'approve_pending_approval') result = await continueDurableApproval(input, 'approve');
+            else if (fn.name === 'reject_pending_approval') result = await continueDurableApproval(input, 'reject');
             else if (fn.name === 'approve_action' && operatorPendingRef.current && onCommand) {
               const pending = operatorPendingRef.current;
               const prepared = await onCommand({ name: 'prepare_action', input: { tool_slug: pending.toolSlug, arguments: pending.arguments, summary: pending.summary } }) as { status?: string; error?: string };
@@ -257,7 +336,7 @@ export function useElpVoice({ enabled, sessionId, onMessage, onCommand, onError 
       console.error('Unable to start ELP voice', error); stop(); setState('error');
       onError?.(error instanceof Error ? error.message : 'Voice could not start.');
     }
-  }, [enabled, onCommand, onError, onMessage, persistMessage, recordPostExecution, runJarbisVoiceCommand, sessionId, stop]);
+  }, [continueDurableApproval, enabled, listPendingApprovals, onCommand, onError, onMessage, persistMessage, recordPostExecution, runJarbisVoiceCommand, sessionId, stop]);
 
   useEffect(() => stop, [stop]);
   return { state, isActive: state === 'connecting' || state === 'listening' || state === 'thinking' || state === 'speaking', isListening: state === 'listening', isThinking: state === 'thinking', isSpeaking: state === 'speaking', start, stop };
