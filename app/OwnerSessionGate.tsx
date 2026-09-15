@@ -16,12 +16,21 @@ export default function OwnerSessionGate() {
   const verifyingRef = useRef(false);
   const noticeTimerRef = useRef<number | null>(null);
 
+  const applyDocumentState = useCallback((next: GateState) => {
+    document.documentElement.dataset.ownerSession = next;
+  }, []);
+
   const clearNoticeTimer = useCallback(() => {
     if (noticeTimerRef.current !== null) {
       window.clearTimeout(noticeTimerRef.current);
       noticeTimerRef.current = null;
     }
   }, []);
+
+  const changeState = useCallback((next: GateState) => {
+    setState(next);
+    applyDocumentState(next);
+  }, [applyDocumentState]);
 
   const readOwnerSession = useCallback(async () => {
     try {
@@ -30,19 +39,21 @@ export default function OwnerSessionGate() {
       const payload = await response.json().catch(() => null) as PasskeyStatus | null;
       const locked = response.ok && payload?.ownerSessionRequired === true;
       lockedRef.current = locked;
-      setState(locked ? 'locked' : 'ready');
+      changeState(locked ? 'locked' : 'ready');
     } catch {
-      // Existing API authorization remains the final enforcement layer if this
-      // lightweight client-side status check is unavailable.
       lockedRef.current = false;
-      setState('ready');
+      changeState('ready');
     }
-  }, []);
+  }, [changeState]);
 
   useEffect(() => {
+    applyDocumentState('checking');
     void readOwnerSession();
-    return () => clearNoticeTimer();
-  }, [clearNoticeTimer, readOwnerSession]);
+    return () => {
+      clearNoticeTimer();
+      delete document.documentElement.dataset.ownerSession;
+    };
+  }, [applyDocumentState, clearNoticeTimer, readOwnerSession]);
 
   const announceAuthentication = useCallback(() => {
     clearNoticeTimer();
@@ -56,7 +67,7 @@ export default function OwnerSessionGate() {
         utterance.pitch = 0.96;
         window.speechSynthesis.speak(utterance);
       } catch {
-        // The visual notice remains available if browser speech is blocked.
+        // Visual authentication guidance remains available if browser speech is blocked.
       }
     }
   }, [clearNoticeTimer]);
@@ -65,27 +76,24 @@ export default function OwnerSessionGate() {
     if (verifyingRef.current) return;
     verifyingRef.current = true;
     announceAuthentication();
-    setState('verifying');
+    changeState('verifying');
 
     try {
       await performPasskeyStepUp('authority-management');
       lockedRef.current = false;
-      setState('ready');
+      changeState('ready');
       setNotice('Owner verified. ELP is ready.');
       clearNoticeTimer();
       noticeTimerRef.current = window.setTimeout(() => setNotice(''), 2200);
-
-      // Resume the exact action the owner originally requested only after the
-      // verified owner session cookie has been established.
       window.requestAnimationFrame(() => target.click());
     } catch {
       lockedRef.current = true;
-      setState('locked');
+      changeState('locked');
       setNotice(AUTH_MESSAGE);
     } finally {
       verifyingRef.current = false;
     }
-  }, [announceAuthentication, clearNoticeTimer]);
+  }, [announceAuthentication, changeState, clearNoticeTimer]);
 
   useEffect(() => {
     const interceptProtectedControl = (event: MouseEvent) => {
