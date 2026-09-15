@@ -37,9 +37,10 @@ test('Serious Mode may propose skills but cannot silently install them', () => {
   assert.doesNotMatch(swarm, /createSkill\s*\(/);
 });
 
-test('consequential actions remain behind ELP approval controls', () => {
-  assert.match(swarm, /approval and standing-authority controls/);
-  assert.match(swarm, /External writes and consequential actions remain behind ELP approval controls/);
+test('external actions are emitted as intents and remain governance-controlled', () => {
+  assert.match(swarm, /actionIntents/);
+  assert.match(swarm, /never invent an exact connector tool slug/);
+  assert.match(swarm, /independently discover tools, verify schemas, classify risk and enforce approval policy/);
   assert.doesNotMatch(swarm, /executeComposioTool/);
 });
 
@@ -48,11 +49,14 @@ test('normal ELP chat supports explicit Serious or AGI Mode without hijacking or
   assert.match(router, /serious\|agi/);
   assert.match(router, /if \(mode === 'serious'\)/);
   assert.match(router, /if \(!mode\) return \{ handled: false \}/);
+  assert.match(router, /orchestrateAgentActions/);
 });
 
-test('Serious Mode runs are authenticated and durably persisted', () => {
+test('Serious Mode runs use AGI core, authenticated governance and durable persistence', () => {
   assert.match(route, /verifyProfileToken/);
-  assert.match(route, /runUnifiedAgentSwarm/);
+  assert.match(route, /runAgiCore/);
+  assert.match(route, /resolveZeroTrustAuthority/);
+  assert.match(route, /orchestrateAgentActions/);
   assert.match(route, /persistAgentRun/);
   assert.match(memory, /'slashy' \| 'vellum' \| 'serious'/);
   assert.match(memory, /traceJson/);
