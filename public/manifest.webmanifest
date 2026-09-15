@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "ELP GPT - AGI",
+  "name": "ELP GPT - The Revolution of AGI",
   "short_name": "ELP",
-  "description": "An evolving private intelligence system progressing toward AGI through multimodal reasoning, persistent memory, autonomous planning, and permission-gated action.",
+  "description": "ELP GPT is an Artificial General Intelligence (AGI) system designed to perform intellectual tasks that a human can through reasoning, memory, autonomous planning, multimodal interaction, and connected actions.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
