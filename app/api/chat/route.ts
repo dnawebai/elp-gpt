@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { routeCoreAgent } from '@/lib/core-agent-router';
 import { runElp, type ChatMessage } from '@/lib/elp';
 import { persistTranscript } from '@/lib/memory';
 import { PROFILE_COOKIE, sanitizeId, verifyProfileToken } from '@/lib/security';
@@ -48,6 +49,25 @@ export async function POST(request: Request) {
     const sessionId = sanitizeId(body.sessionId, 'web');
     const lastUser = messages[messages.length - 1]!;
     await persistTranscript(profile.profileId, sessionId, 'user', lastUser.content);
+
+    const specialist = await routeCoreAgent({
+      profileId: profile.profileId,
+      sessionId,
+      userText: lastUser.content,
+    });
+
+    if (specialist.handled) {
+      await persistTranscript(profile.profileId, sessionId, 'assistant', specialist.text);
+      return NextResponse.json(
+        {
+          message: specialist.text,
+          provider: 'elp-specialist',
+          agentMode: specialist.mode,
+          agentMetadata: specialist.metadata,
+        },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
 
     const result = await runElp({ messages, profileId: profile.profileId, sessionId });
     await persistTranscript(profile.profileId, sessionId, 'assistant', result.text);
