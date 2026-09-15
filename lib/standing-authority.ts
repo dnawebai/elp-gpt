@@ -52,6 +52,13 @@ function amountFromArgs(args: Record<string, unknown>) {
   for (const key of keys) { const n = Number(args[key]); if (Number.isFinite(n) && n >= 0) return n; }
   return null;
 }
+function currencyFromArgs(args: Record<string, unknown>) {
+  for (const key of ['currency','currency_code','currencyCode']) {
+    const value = args[key];
+    if (typeof value === 'string' && value.trim()) return value.trim().toUpperCase().slice(0, 8);
+  }
+  return null;
+}
 function recipientDomains(args: Record<string, unknown>) {
   const text = [args.to,args.recipient,args.email,args.recipients].flatMap((v) => Array.isArray(v) ? v : [v]).filter((v): v is string => typeof v === 'string').join(',');
   return [...text.matchAll(/@([a-z0-9.-]+\.[a-z]{2,})/gi)].map((m) => m[1].toLowerCase());
@@ -87,6 +94,7 @@ export async function saveStandingAuthorityPolicy(profileId: string, actorPrinci
     createdAt: current?.createdAt || now, updatedAt: now, createdByPrincipalId: current?.createdByPrincipalId || actorPrincipalId,
   };
   if (!policy.name || !policy.principalId) throw new Error('Policy name and principal are required.');
+  if (policy.maxAmount !== undefined && !policy.currency) throw new Error('A currency is required when a maximum amount is configured.');
   await h.session.addMessages([{ peerId: h.user.id, content: `[STANDING_AUTHORITY] ${policy.name}`, metadata: { elpStandingAuthorityPolicy: true, recordVersion: 1, policyId: policy.id, policyJson: JSON.stringify(policy) } }]);
   return policy;
 }
@@ -106,8 +114,12 @@ export async function evaluateStandingAuthority(args: { profileId: string; princ
   for (const p of candidates) {
     if (args.risk === 'high' && (!p.allowHighRisk || p.maxRisk !== 'high')) continue;
     if (p.allowedConnectedAccountIds.length && (!args.connectedAccountId || !p.allowedConnectedAccountIds.includes(args.connectedAccountId))) continue;
-    const domains = recipientDomains(args.arguments); if (p.recipientDomains.length && domains.some((d)=>!p.recipientDomains.includes(d))) continue;
-    const amount = amountFromArgs(args.arguments); if (p.maxAmount !== undefined && amount !== null && amount > p.maxAmount) continue;
+    const domains = recipientDomains(args.arguments);
+    if (p.recipientDomains.length && (!domains.length || domains.some((d)=>!p.recipientDomains.includes(d)))) continue;
+    const amount = amountFromArgs(args.arguments);
+    if (p.maxAmount !== undefined && (amount === null || amount > p.maxAmount)) continue;
+    const currency = currencyFromArgs(args.arguments);
+    if (p.currency && (!currency || currency !== p.currency)) continue;
     const h = await sessionFor(args.profileId); if (!h) continue;
     const messages = await listHonchoMessages(h.session, { pageSize: 100, maxPages: 10, reverse: true });
     const day = new Date().toISOString().slice(0,10);
