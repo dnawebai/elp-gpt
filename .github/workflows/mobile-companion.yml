@@ -1,0 +1,43 @@
+name: Mobile Companion
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'mobile-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: companion/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npx expo config --type public
+
+  store-build:
+    if: ${{ startsWith(github.ref, 'refs/tags/mobile-v') }}
+    needs: validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: companion/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm install --global eas-cli
+      - name: Build iOS and Android store artifacts
+        run: eas build --platform all --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
