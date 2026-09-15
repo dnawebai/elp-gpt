@@ -8,7 +8,7 @@ function targetPurpose(url: string): PasskeyStepUpPurpose | null {
     const parsed = new URL(url, window.location.origin);
     if (parsed.origin !== window.location.origin) return null;
     if (parsed.pathname === '/api/actions/approve') return 'high-risk-approval';
-    if (parsed.pathname === '/api/authority-control' || parsed.pathname === '/api/passkeys' || parsed.pathname === '/api/security-operations') return 'authority-management';
+    if (parsed.pathname === '/api/authority-control' || parsed.pathname === '/api/passkeys' || parsed.pathname === '/api/security-operations' || parsed.pathname === '/api/security-automation' || parsed.pathname === '/api/standing-authority') return 'authority-management';
     return null;
   } catch { return null; }
 }
@@ -34,21 +34,28 @@ export default function PasskeyStepUpBridge() {
 
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const response = await originalFetch(input, init);
-      const purpose = targetPurpose(requestUrl(input));
-      if (!purpose || response.status !== 428 || steppingUp) return response;
+      if (response.status !== 428 || steppingUp) return response;
 
       let signal: Record<string, unknown> | null = null;
       try { signal = await response.clone().json() as Record<string, unknown>; } catch { return response; }
       if (signal?.stepUpRequired !== true || signal?.stepUpMethod !== 'passkey') return response;
 
-      const rawBody = await requestBody(input, init);
-      if (!rawBody) return response;
-      let parsedBody: Record<string, unknown>;
-      try { parsedBody = JSON.parse(rawBody) as Record<string, unknown>; } catch { return response; }
+      const ownerSessionRequired = signal?.ownerSessionRequired === true;
+      const purpose = ownerSessionRequired ? 'authority-management' : targetPurpose(requestUrl(input));
+      if (!purpose) return response;
 
       steppingUp = true;
       try {
         const stepUpToken = await performPasskeyStepUp(purpose, originalFetch);
+        if (ownerSessionRequired) {
+          return await originalFetch(input, { ...init, cache: 'no-store' });
+        }
+
+        const rawBody = await requestBody(input, init);
+        if (!rawBody) return response;
+        let parsedBody: Record<string, unknown>;
+        try { parsedBody = JSON.parse(rawBody) as Record<string, unknown>; } catch { return response; }
+
         const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
         headers.set('Content-Type', 'application/json');
         return await originalFetch(requestUrl(input), {
