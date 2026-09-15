@@ -24,17 +24,19 @@ test('approval risk maps to explicit principal capabilities', () => {
 });
 
 test('approved action tokens are bound to the approving principal', async () => {
-  const [security, approve, execute, governor] = await Promise.all([
+  const [security, approval, approveRoute, executeRoute, governor] = await Promise.all([
     source('lib/security.ts'),
+    source('lib/action-approval.ts'),
     source('app/api/actions/approve/route.ts'),
     source('app/api/actions/execute/route.ts'),
     source('lib/action-governor.ts'),
   ]);
   assert.match(security, /principalId\?: string/);
-  assert.match(approve, /principalId: context\.principal\.id/);
-  assert.match(approve, /requiredApprovalCapability/);
-  assert.match(execute, /executeGovernedAction/);
+  assert.match(approval, /principalId: context\.principal\.id/);
+  assert.match(approval, /requiredApprovalCapability/);
   assert.match(governor, /token\.principalId && token\.principalId !== context\.principal\.id/);
+  assert.match(approveRoute, /approveGovernedAction/);
+  assert.match(executeRoute, /executeGovernedAction/);
 });
 
 test('companion enrollment is signed, one-time and revocable', async () => {
