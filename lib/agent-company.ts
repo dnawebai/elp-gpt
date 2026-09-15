@@ -1,4 +1,4 @@
-export type CompanyId = 'iquash' | 'mezcalsearch' | 'dnaweb' | 'elp_owner';
+export type CompanyId = 'shared' | 'iquash' | 'mezcalsearch' | 'dnaweb' | 'elp_owner';
 
 export type CompanyGoal = {
   company: CompanyId;
