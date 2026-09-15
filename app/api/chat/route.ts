@@ -3,8 +3,10 @@ import { routeCoreAgent } from '@/lib/core-agent-router';
 import { runElp, type ChatMessage } from '@/lib/elp';
 import { persistTranscript } from '@/lib/memory';
 import { PROFILE_COOKIE, sanitizeId, verifyProfileToken } from '@/lib/security';
+import { resolveZeroTrustAuthority } from '@/lib/zero-trust-authority';
 
 export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 function readProfile(request: Request) {
   const value = (request.headers.get('cookie') || '')
@@ -50,10 +52,12 @@ export async function POST(request: Request) {
     const lastUser = messages[messages.length - 1]!;
     await persistTranscript(profile.profileId, sessionId, 'user', lastUser.content);
 
+    const authorityContext = await resolveZeroTrustAuthority(request).catch(() => null);
     const specialist = await routeCoreAgent({
       profileId: profile.profileId,
       sessionId,
       userText: lastUser.content,
+      authorityContext,
     });
 
     if (specialist.handled) {
