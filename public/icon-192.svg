@@ -1,9 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="42" fill="#010813"/>
-  <circle cx="96" cy="96" r="66" fill="none" stroke="#4ED9FF" stroke-width="4" opacity="0.28"/>
-  <circle cx="96" cy="96" r="50" fill="none" stroke="#4ED9FF" stroke-width="3" opacity="0.48"/>
-  <path d="M71 55v68c0 11 8 18 19 18h31" fill="none" stroke="#D9F8FF" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M126 62c11 7 18 20 18 34 0 15-7 28-18 35" fill="none" stroke="#4ED9FF" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="126" cy="62" r="5" fill="#B9F2FF"/>
-  <circle cx="126" cy="131" r="5" fill="#B9F2FF"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 512 512" role="img" aria-label="ELP GPT">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="46%" r="70%"><stop offset="0" stop-color="#062a31"/><stop offset=".52" stop-color="#001116"/><stop offset="1" stop-color="#00070a"/></radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#00e8ef" stroke-opacity=".2" stroke-width="3"/>
+  <circle cx="256" cy="256" r="152" fill="none" stroke="#00e8ef" stroke-opacity=".34" stroke-width="2"/>
+  <circle cx="256" cy="256" r="113" fill="none" stroke="#00f6ff" stroke-opacity=".52" stroke-width="2"/>
+  <g stroke="#00f6ff" stroke-width="9" stroke-linecap="round" filter="url(#glow)"><path d="M194 153v22"/><path d="M214 141v46"/><path d="M234 128v72"/><path d="M256 116v96"/><path d="M278 132v64"/><path d="M298 143v42"/><path d="M318 155v18"/></g>
+  <text x="256" y="304" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="112" font-weight="300" letter-spacing="18" fill="#eaffff">ELP</text>
+  <text x="256" y="355" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="30" font-weight="600" letter-spacing="18" fill="#8eeff5">GPT</text>
 </svg>
