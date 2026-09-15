@@ -52,7 +52,7 @@ export function getDeepgramRuntimeConfig(): DeepgramRuntimeConfig {
   const listenModel = process.env.ELP_LISTEN_MODEL || 'flux-general-multi';
   const voiceModel = process.env.ELP_VOICE_MODEL || 'flux-cliff-en';
   const isFluxVoice = voiceModel.startsWith('flux-');
-  const requestedSpeed = boundedNumber(process.env.ELP_VOICE_SPEED, 1, 0.7, 1.5);
+  const requestedSpeed = boundedNumber(process.env.ELP_VOICE_SPEED, 1.05, 0.7, 1.5);
 
   return {
     apiBaseUrl: normalizeHttpBase(process.env.DEEPGRAM_API_URL),
@@ -68,9 +68,9 @@ export function getDeepgramRuntimeConfig(): DeepgramRuntimeConfig {
       'Honcho',
       'Together AI',
     ]),
-    eotThreshold: boundedNumber(process.env.ELP_EOT_THRESHOLD, 0.78, 0.5, 0.9),
-    eagerEotThreshold: boundedNumber(process.env.ELP_EAGER_EOT_THRESHOLD, 0.5, 0.3, 0.9),
-    eotTimeoutMs: Math.round(boundedNumber(process.env.ELP_EOT_TIMEOUT_MS, 2600, 500, 10000)),
+    eotThreshold: boundedNumber(process.env.ELP_EOT_THRESHOLD, 0.72, 0.5, 0.9),
+    eagerEotThreshold: boundedNumber(process.env.ELP_EAGER_EOT_THRESHOLD, 0.42, 0.3, 0.9),
+    eotTimeoutMs: Math.round(boundedNumber(process.env.ELP_EOT_TIMEOUT_MS, 1100, 500, 10000)),
     voiceModel,
     speakVersion: isFluxVoice ? 'v2' : 'v1',
     voiceSpeed: isFluxVoice ? nearestFluxSpeed(requestedSpeed) : requestedSpeed,
