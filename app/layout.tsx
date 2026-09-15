@@ -5,6 +5,7 @@ import './profile.css';
 import './install-prompt.css';
 import './retell-call.css';
 import './responsive-polish.css';
+import './owner-session-gate.css';
 import type { Metadata, Viewport } from 'next';
 import InstallAppPrompt from './InstallAppPrompt';
 import OwnerSessionGate from './OwnerSessionGate';
