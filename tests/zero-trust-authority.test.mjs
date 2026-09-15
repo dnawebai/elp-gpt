@@ -15,22 +15,18 @@ test('delegated principal sessions are registry-bound and revocable',async()=>{
 });
 
 test('principal access is one-time and delegated high risk requires step-up',async()=>{
-  const [sessionRoute,approve]=await Promise.all([source('app/api/authority-session/route.ts'),source('app/api/actions/approve/route.ts')]);
+  const [sessionRoute,approveRoute,approval]=await Promise.all([source('app/api/authority-session/route.ts'),source('app/api/actions/approve/route.ts'),source('lib/action-approval.ts')]);
   assert.match(sessionRoute,/exchange-access/);assert.match(sessionRoute,/consumePrincipalAccessNonce/);assert.match(sessionRoute,/httpOnly: true/);assert.match(sessionRoute,/secure: true/);
-  assert.match(approve,/stepUpToken/);assert.match(approve,/high-risk-approval/);assert.match(approve,/status: 428/);
+  assert.match(approveRoute,/approveGovernedAction/);assert.match(approval,/stepUpToken/);assert.match(approval,/high-risk-approval/);assert.match(approval,/status: 428/);
 });
 
 test('action pipeline binds planning approval and execution to live zero-trust authority',async()=>{
-  const [plan,approve,execute,governor]=await Promise.all([
-    source('app/api/actions/plan/route.ts'),
-    source('app/api/actions/approve/route.ts'),
-    source('app/api/actions/execute/route.ts'),
-    source('lib/action-governor.ts'),
+  const [planRoute,approveRoute,executeRoute,approval,governor]=await Promise.all([
+    source('app/api/actions/plan/route.ts'),source('app/api/actions/approve/route.ts'),source('app/api/actions/execute/route.ts'),source('lib/action-approval.ts'),source('lib/action-governor.ts')
   ]);
-  for(const file of [plan,approve,execute]) assert.match(file,/resolveZeroTrustAuthority/);
-  assert.match(plan,/planGovernedAction/);
-  assert.match(execute,/executeGovernedAction/);
+  for(const file of [planRoute,approveRoute,executeRoute]) assert.match(file,/resolveZeroTrustAuthority/);
   assert.match(governor,/principalId: context\.principal\.id/);
+  assert.match(approval,/principalId: context\.principal\.id/);
   assert.match(governor,/token\.principalId !== context\.principal\.id/);
 });
 
