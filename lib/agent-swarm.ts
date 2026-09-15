@@ -44,6 +44,14 @@ export type SkillCandidate = {
   validation: string[];
 };
 
+export type ActionIntent = {
+  purpose: string;
+  query: string;
+  rationale: string;
+  toolkit?: string;
+  knownArguments?: Record<string, unknown>;
+};
+
 export type UnifiedSwarmResult = {
   mode: 'serious-multi-agent-swarm';
   objective: string;
@@ -51,6 +59,7 @@ export type UnifiedSwarmResult = {
   findings: SwarmFinding[];
   synthesis: string;
   skillCandidates: SkillCandidate[];
+  actionIntents: ActionIntent[];
   relevantSkills: string[];
   trace: Array<{
     agentId: string;
@@ -205,7 +214,7 @@ async function callReasoner(system: string, user: string, maxTokens = 1100) {
         failures.push(`${provider.name}:${response.status}`);
         continue;
       }
-      const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
       const text = data.choices?.[0]?.message?.content?.trim();
       if (!text) {
         failures.push(`${provider.name}:empty`);
@@ -219,29 +228,67 @@ async function callReasoner(system: string, user: string, maxTokens = 1100) {
   throw new Error(`All reasoning providers failed (${failures.join(', ') || 'unknown error'}).`);
 }
 
-function extractSkillCandidates(text: string): SkillCandidate[] {
+function jsonPayloads(text: string) {
   const blocks = [...text.matchAll(/```json\s*([\s\S]*?)```/gi)].map((match) => match[1]);
+  const payloads: Record<string, unknown>[] = [];
   for (const block of blocks) {
     try {
-      const parsed = JSON.parse(block) as { skillCandidates?: unknown } | unknown[];
-      const candidates = Array.isArray(parsed) ? parsed : (parsed as { skillCandidates?: unknown }).skillCandidates;
-      if (!Array.isArray(candidates)) continue;
-      return candidates
-        .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
-        .map((item) => ({
-          name: clean(item.name, 120),
-          purpose: clean(item.purpose, 500),
-          domain: clean(item.domain, 80),
-          inputs: Array.isArray(item.inputs) ? item.inputs.map((value) => clean(value, 160)).filter(Boolean).slice(0, 12) : [],
-          outputs: Array.isArray(item.outputs) ? item.outputs.map((value) => clean(value, 160)).filter(Boolean).slice(0, 12) : [],
-          connectors: Array.isArray(item.connectors) ? item.connectors.map((value) => clean(value, 120)).filter(Boolean).slice(0, 12) : [],
-          validation: Array.isArray(item.validation) ? item.validation.map((value) => clean(value, 220)).filter(Boolean).slice(0, 12) : [],
-        }))
-        .filter((item) => item.name && item.purpose)
-        .slice(0, 10);
+      const parsed = JSON.parse(block);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) payloads.push(parsed as Record<string, unknown>);
     } catch {
       continue;
     }
+  }
+  return payloads;
+}
+
+function extractSkillCandidates(text: string): SkillCandidate[] {
+  for (const payload of jsonPayloads(text)) {
+    const candidates = payload.skillCandidates;
+    if (!Array.isArray(candidates)) continue;
+    return candidates
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
+      .map((item) => ({
+        name: clean(item.name, 120),
+        purpose: clean(item.purpose, 500),
+        domain: clean(item.domain, 80),
+        inputs: Array.isArray(item.inputs) ? item.inputs.map((value) => clean(value, 160)).filter(Boolean).slice(0, 12) : [],
+        outputs: Array.isArray(item.outputs) ? item.outputs.map((value) => clean(value, 160)).filter(Boolean).slice(0, 12) : [],
+        connectors: Array.isArray(item.connectors) ? item.connectors.map((value) => clean(value, 120)).filter(Boolean).slice(0, 12) : [],
+        validation: Array.isArray(item.validation) ? item.validation.map((value) => clean(value, 220)).filter(Boolean).slice(0, 12) : [],
+      }))
+      .filter((item) => item.name && item.purpose)
+      .slice(0, 10);
+  }
+  return [];
+}
+
+function safeKnownArguments(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  try {
+    const encoded = JSON.stringify(value);
+    if (encoded.length > 12_000) return undefined;
+    return value as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+function extractActionIntents(text: string): ActionIntent[] {
+  for (const payload of jsonPayloads(text)) {
+    const intents = payload.actionIntents;
+    if (!Array.isArray(intents)) continue;
+    return intents
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
+      .map((item) => ({
+        purpose: clean(item.purpose, 500),
+        query: clean(item.query, 300),
+        rationale: clean(item.rationale, 700),
+        ...(clean(item.toolkit, 80) ? { toolkit: clean(item.toolkit, 80).toUpperCase() } : {}),
+        ...(safeKnownArguments(item.knownArguments) ? { knownArguments: safeKnownArguments(item.knownArguments) } : {}),
+      }))
+      .filter((item) => item.purpose && item.query && item.rationale)
+      .slice(0, 6);
   }
   return [];
 }
@@ -301,9 +348,9 @@ export async function runUnifiedAgentSwarm(args: {
   ).join('\n\n');
 
   const synthesis = await callReasoner(
-    `You are ELP's Chief Synthesizer for Serious Multi-Agent Mode. Reconcile specialist outputs into one rigorous plan. Do not average disagreements away: identify conflicts, decide which position is stronger and explain what evidence would resolve uncertainty. Existing skills may be reused; proposed skills are specifications only and must never be treated as installed. External writes and consequential actions remain behind ELP approval controls.`,
-    `${sharedContext}\n\nSPECIALIST WORK:\n${specialistWork}\n\nReturn: 1) Executive Answer, 2) Evidence vs Assumptions, 3) Cross-Agent Agreements, 4) Material Disagreements, 5) Integrated Execution Plan with owners and sequence, 6) Metrics and Stop Conditions, 7) Risks and Approval Boundaries, 8) Missing Evidence, 9) Reusable Skill Candidates. In section 9, if new reusable capabilities are genuinely missing, include one JSON code block shaped as {"skillCandidates":[{"name":"...","purpose":"...","domain":"...","inputs":[],"outputs":[],"connectors":[],"validation":[]}]}. If none are needed, use {"skillCandidates":[]}.`,
-    1800,
+    `You are ELP's Chief Synthesizer for Serious Multi-Agent Mode. Reconcile specialist outputs into one rigorous plan. Do not average disagreements away: identify conflicts, decide which position is stronger and explain what evidence would resolve uncertainty. Existing skills may be reused; proposed skills are specifications only and must never be treated as installed. External actions are governed: output natural-language action intents only, never invent an exact connector tool slug, and never claim an external action completed. ELP will independently discover tools, verify schemas, classify risk and enforce approval policy.`,
+    `${sharedContext}\n\nSPECIALIST WORK:\n${specialistWork}\n\nReturn: 1) Executive Answer, 2) Evidence vs Assumptions, 3) Cross-Agent Agreements, 4) Material Disagreements, 5) Integrated Execution Plan with owners and sequence, 6) Metrics and Stop Conditions, 7) Risks and Approval Boundaries, 8) Missing Evidence, 9) Reusable Skill Candidates, 10) Governed Action Intents. Finish with exactly one JSON code block shaped as {"skillCandidates":[{"name":"...","purpose":"...","domain":"...","inputs":[],"outputs":[],"connectors":[],"validation":[]}],"actionIntents":[{"purpose":"...","query":"natural-language Composio tool search query","rationale":"...","toolkit":"OPTIONAL_TOOLKIT","knownArguments":{}}]}. Use at most 6 action intents. Include an intent only when a connected external read/write materially advances the objective. knownArguments may contain only values explicitly supplied in the objective/context; omit unknown recipients, IDs, dates, amounts, URLs, account values or other missing facts. If no skill or action is needed, return empty arrays.`,
+    2100,
   );
 
   return {
@@ -313,6 +360,7 @@ export async function runUnifiedAgentSwarm(args: {
     findings,
     synthesis: synthesis.text,
     skillCandidates: extractSkillCandidates(synthesis.text),
+    actionIntents: extractActionIntents(synthesis.text),
     relevantSkills,
     trace: findings.map((finding) => ({
       agentId: finding.agentId,
@@ -328,5 +376,5 @@ export async function runUnifiedAgentSwarm(args: {
 }
 
 export function seriousModePrompt() {
-  return `SERIOUS MULTI-AGENT MODE\n${ELP_SWARM_AGENTS.map((agent) => `- ${agent.name} (${agent.domain}): ${agent.mission}`).join('\n')}\nUse this mode only for complex multi-domain objectives or when explicitly requested. It is bounded, evidence-aware, approval-governed and may propose—but never silently install—new reusable skills.`;
+  return `SERIOUS MULTI-AGENT MODE\n${ELP_SWARM_AGENTS.map((agent) => `- ${agent.name} (${agent.domain}): ${agent.mission}`).join('\n')}\nUse this mode only for complex multi-domain objectives or when explicitly requested. It is bounded, evidence-aware, approval-governed and may propose—but never silently install—new reusable skills. External actions are emitted as natural-language intents and resolved through the shared governed action pipeline.`;
 }
