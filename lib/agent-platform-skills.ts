@@ -67,4 +67,15 @@ export const AGENT_PLATFORM_SKILLS = [
     examples: ['Show me why this workflow failed', 'Replay the slowest execution path'],
     requires: ['Workflow execution trace'],
   },
+  {
+    id: 'serious-multi-agent-mode',
+    name: 'Serious Multi-Agent Mode',
+    category: 'intelligence',
+    description: 'Assemble a bounded cross-functional swarm of strategy, research, growth, sales, content, product, engineering, automation, finance, legal, security and operations specialists, then reconcile their evidence, disagreements, risks and execution plan.',
+    risk: 'read',
+    toolkits: [],
+    keywords: ['serious mode', 'multi-agent', 'expert swarm', 'specialist swarm', 'cross-functional analysis', 'multi-agent strategy'],
+    examples: ['Use Serious Mode to analyse this business', 'Get multiple specialists to challenge this plan'],
+    requires: ['Hermes or Together reasoning provider'],
+  },
 ] as const satisfies readonly ElpSkill[];
