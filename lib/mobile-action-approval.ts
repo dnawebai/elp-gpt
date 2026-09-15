@@ -8,7 +8,7 @@ import {
   recordActionFailed,
   recordActionRejected,
 } from '@/lib/approval-ledger';
-import { hasCapability, requiredApprovalCapability, type Principal } from '@/lib/authority-policy';
+import { hasCapability, requiredApprovalCapability, type PrincipalRole } from '@/lib/authority-policy';
 import { executeComposioTool, isComposioConfigured } from '@/lib/composio';
 import { getElpSessionSecret } from '@/lib/elp-config';
 import { listHonchoMessages } from '@/lib/honcho-pagination';
@@ -44,6 +44,12 @@ type MobileActionEnvelope = {
   toolSlug: string;
   arguments: Record<string, unknown>;
   connectedAccountId?: string;
+};
+
+type MobileApprovalPrincipal = {
+  id: string;
+  role: PrincipalRole;
+  capabilities?: readonly string[];
 };
 
 const STATUSES = new Set<MobileApprovalStatus>(['pending','approved','executing','executed','rejected','failed','expired']);
@@ -127,7 +133,7 @@ export async function rejectMobileAction(input:{profileId:string;principalId:str
   return{ok:true,status:'rejected' as const,ticketId:ticket.id};
 }
 function evidencePreview(value:unknown){try{const text=JSON.stringify(value);return text.length<=1800?text:`${text.slice(0,1800)}…`;}catch{return'Execution completed; result was not serializable.';}}
-export async function approveAndExecuteMobileAction(input:{profileId:string;principal:Principal;ticketId:string;deviceId:string}){
+export async function approveAndExecuteMobileAction(input:{profileId:string;principal:MobileApprovalPrincipal;ticketId:string;deviceId:string}){
   const ticket=await findTicket(input.profileId,input.principal.id,input.ticketId);if(!ticket)throw new Error('Approval ticket not found.');if(ticket.status!=='pending')throw new Error(`Approval ticket is already ${ticket.status}.`);if(Date.parse(ticket.expiresAt)<=Date.now()){await update(input.profileId,ticket,{status:'expired',deviceId:input.deviceId});throw new Error('Approval ticket expired.');}
   if(ticket.risk==='high')return{ok:false,status:'step_up_required' as const,ticketId:ticket.id,message:'High-risk actions require a passkey-authenticated ELP owner session. Native biometric confirmation alone does not weaken that boundary.'};
   if(!isComposioConfigured())throw new Error('Connected action execution is unavailable.');
