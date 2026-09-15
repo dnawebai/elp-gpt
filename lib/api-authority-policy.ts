@@ -6,6 +6,7 @@ const PUBLIC_EXACT = new Set([
   '/api/device-agent',
   '/api/device-vision',
   '/api/mobile-companion',
+  '/api/mobile-voice',
   '/api/companion/enroll',
   '/api/voice/think',
 ]);
