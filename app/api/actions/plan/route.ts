@@ -4,6 +4,7 @@ import { actionDigest, approvalCopy, classifyActionRisk, normalizeToolSlug, sani
 import { recordActionApproved, recordActionProposal } from '@/lib/approval-ledger';
 import { hasCapability, requiredApprovalCapability } from '@/lib/authority-policy';
 import { isComposioConfigured } from '@/lib/composio';
+import { queueMobileActionApproval } from '@/lib/mobile-action-approval';
 import { createActionToken, sanitizeId } from '@/lib/security';
 import { recordSecurityEventSafe } from '@/lib/security-audit';
 import { evaluateStandingAuthority, recordStandingAuthorityUse } from '@/lib/standing-authority';
@@ -47,5 +48,23 @@ export async function POST(request: Request) {
   }
 
   const proposalToken = createActionToken({ stage: 'proposal', profileId: context.profileId, sessionId, digest, risk, nonce, principalId: context.principal.id, ttlSeconds: proposalTtl });
-  return NextResponse.json({ configured: isComposioConfigured(), action: { toolSlug, arguments: argumentsValue, connectedAccountId, summary }, risk, requiresApproval: risk !== 'read', policy: approvalCopy(risk), proposedByPrincipalId: context.principal.id, proposalToken, expiresInSeconds: proposalTtl, ...(standing ? { standingAuthorityReason: standing.reason } : {}) }, { headers: { 'Cache-Control': 'no-store, private' } });
+  let mobileApproval: Awaited<ReturnType<typeof queueMobileActionApproval>> = null;
+  if (risk !== 'read') {
+    try {
+      mobileApproval = await queueMobileActionApproval({
+        profileId: context.profileId,
+        principalId: context.principal.id,
+        proposalToken,
+        toolSlug,
+        arguments: argumentsValue,
+        connectedAccountId,
+        summary,
+        risk,
+        expiresAt,
+      });
+    } catch (error) {
+      console.error('ELP native mobile approval queue failed', error);
+    }
+  }
+  return NextResponse.json({ configured: isComposioConfigured(), action: { toolSlug, arguments: argumentsValue, connectedAccountId, summary }, risk, requiresApproval: risk !== 'read', policy: approvalCopy(risk), proposedByPrincipalId: context.principal.id, proposalToken, expiresInSeconds: proposalTtl, ...(mobileApproval ? { mobileApproval: { ticketId: mobileApproval.ticketId, pushed: mobileApproval.sent > 0 } } : {}), ...(standing ? { standingAuthorityReason: standing.reason } : {}) }, { headers: { 'Cache-Control': 'no-store, private' } });
 }
