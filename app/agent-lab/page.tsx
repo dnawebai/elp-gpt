@@ -11,7 +11,7 @@ const sampleWorkflow = {
   evaluationThreshold: 0.8,
   nodes: [
     { id: 'analyse', type: 'agent', name: 'Senior Analyst', prompt: 'Analyse this request and return a concise executive answer: {{request}}', outputKey: 'analysis' },
-    { id: 'quality', type: 'condition', name: 'Quality Gate', condition: { key: 'analysis', operator: 'nonEmpty' } },
+    { id: 'quality', type: 'condition', name: 'Quality Gate', condition: { key: 'analysis', operator: 'truthy' } },
     { id: 'final', type: 'output', name: 'Final Output', inputKey: 'analysis', outputKey: 'answer' },
   ],
   edges: [
