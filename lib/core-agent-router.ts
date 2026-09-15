@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { runAgiCore } from '@/lib/agi-core';
 import { persistAgentRun } from '@/lib/agent-run-memory';
-import { runUnifiedAgentSwarm } from '@/lib/agent-swarm';
 import { runSlashyMission } from '@/lib/slashy-agent';
 import { runVellumWorkflow, type VellumWorkflow } from '@/lib/vellum-agent';
 
@@ -20,7 +20,7 @@ function cleanObjective(input: string, mode: CoreAgentMode) {
     ? [/^\s*\/slashy\s*/i, /^\s*(use|ask|run)\s+slashy(?:\s+agent)?\s*[:,-]?\s*/i, /^\s*slashy\s*[:,-]?\s*/i]
     : mode === 'vellum'
       ? [/^\s*\/vellum\s*/i, /^\s*(use|ask|run)\s+(this\s+through\s+)?vellum(?:\s+agent)?\s*[:,-]?\s*/i, /^\s*vellum\s*[:,-]?\s*/i]
-      : [/^\s*\/serious\s*/i, /^\s*(?:use|run|activate|enable)\s+serious(?:\s+multi[- ]?agent)?\s+mode\s*[:,-]?\s*/i, /^\s*serious(?:\s+mode)?\s*[:,-]?\s*/i];
+      : [/^\s*\/(?:serious|agi)\s*/i, /^\s*(?:use|run|activate|enable)\s+(?:elp\s+)?(?:agi|serious(?:\s+multi[- ]?agent)?\s+mode)\s*[:,-]?\s*/i, /^\s*(?:elp\s+)?(?:agi|serious(?:\s+mode)?)\s*[:,-]?\s*/i];
   let value = input.trim();
   for (const pattern of prefixes) value = value.replace(pattern, '');
   return value.trim() || input.trim();
@@ -30,7 +30,7 @@ function detectMode(input: string): CoreAgentMode | null {
   const q = input.trim().toLowerCase();
   if (/^\/slashy\b|\b(?:use|ask|run)\s+slashy\b|^slashy\s*[:,-]/i.test(input)) return 'slashy';
   if (/^\/vellum\b|\b(?:use|ask)\s+vellum\b|\brun\s+(?:this\s+)?through\s+vellum\b|^vellum\s*[:,-]/i.test(input)) return 'vellum';
-  if (/^\/serious\b|\b(?:use|run|activate|enable)\s+serious(?:\s+multi[- ]?agent)?\s+mode\b|^serious(?:\s+mode)?\s*[:,-]/i.test(input)) return 'serious';
+  if (/^\/(?:serious|agi)\b|\b(?:use|run|activate|enable)\s+(?:elp\s+)?(?:agi|serious(?:\s+multi[- ]?agent)?\s+mode)\b|^serious(?:\s+mode)?\s*[:,-]/i.test(input)) return 'serious';
 
   const slashySignals = [
     /\bdropped balls?\b/,
@@ -52,6 +52,11 @@ function detectMode(input: string): CoreAgentMode | null {
     /\bmulti[- ]agent (?:analysis|strategy|review|plan)\b/,
     /\b(?:assemble|run|use) (?:the )?(?:expert|specialist) swarm\b/,
     /\bget (?:all|multiple) (?:experts|agents|specialists) to (?:analyse|analyze|review|solve)\b/,
+    /\bfirst agi\b/,
+    /\bbuild (?:an?|the)?\s*agi\b/,
+    /\belp ventures\b.*\b(?:agent|intelligence|research|repository|repositories|build)\b/,
+    /\b(?:analy[sz]e|scan|research)\b.*\b(?:github|git)\b.*\b(?:repo|repository|repositories)\b/,
+    /\b(?:all|multiple)\s+(?:ai\s+)?agents?\b.*\b(?:work|working|together|orchestrat)/,
   ];
   if (seriousSignals.some((pattern) => pattern.test(q))) return 'serious';
   return null;
@@ -138,7 +143,7 @@ export async function routeCoreAgent(args: {
   }
 
   if (mode === 'serious') {
-    const result = await runUnifiedAgentSwarm({ objective });
+    const result = await runAgiCore({ profileId: args.profileId, objective, maxAgents: 8 });
     const runId = randomUUID();
     await persistAgentRun(args.profileId, {
       id: runId,
@@ -149,6 +154,8 @@ export async function routeCoreAgent(args: {
       trace: result.trace,
       metadata: {
         agents: result.agents.map((agent) => ({ id: agent.id, name: agent.name, domain: agent.domain })),
+        cognitiveLenses: result.cognitiveLenses.map((lens) => ({ id: lens.id, name: lens.name, provider: lens.provider, latencyMs: lens.latencyMs })),
+        verifier: result.verifier,
         relevantSkills: result.relevantSkills,
         skillCandidates: result.skillCandidates,
         failedAgents: result.findings.filter((finding) => finding.status === 'failed').map((finding) => finding.agentId),
@@ -161,7 +168,9 @@ export async function routeCoreAgent(args: {
       text: result.synthesis,
       metadata: {
         runId,
-        agentCount: result.agents.length,
+        agentCount: result.agents.length + result.cognitiveLenses.length + 2,
+        specialistAgents: result.agents.length,
+        cognitiveLenses: result.cognitiveLenses.map((lens) => lens.id),
         completedAgents: result.findings.filter((finding) => finding.status === 'completed').length,
         failedAgents: result.findings.filter((finding) => finding.status === 'failed').length,
         skillCandidates: result.skillCandidates,
