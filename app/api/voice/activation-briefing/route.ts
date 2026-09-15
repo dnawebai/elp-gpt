@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { buildNextBestActionQueue, nextBestActionSpeech } from '@/lib/next-best-action';
 import { buildVoiceActivationBriefing } from '@/lib/voice-activation-briefing';
 import {
   acknowledgeAdaptiveVoiceActivationBriefing,
@@ -50,7 +51,11 @@ export async function POST(request: Request) {
     const timezone = typeof body?.timezone === 'string' ? clip(body.timezone, 100) : undefined;
     const briefing = await buildVoiceActivationBriefing(context, timezone);
     const adaptive = await prepareAdaptiveVoiceActivationBriefing(context, briefing);
-    return NextResponse.json(adaptive, { headers: { 'Cache-Control': 'no-store, private' } });
+    const focusKeys = adaptive.changeState === 'initial' ? undefined : adaptive.changedKeys;
+    const nextBestActions = buildNextBestActionQueue(context, briefing, { focusKeys });
+    const recommendation = adaptive.shouldSpeak ? nextBestActionSpeech(nextBestActions) : '';
+    const speech = [adaptive.speech, recommendation].filter(Boolean).join(' ').slice(0, 1800);
+    return NextResponse.json({ ...adaptive, speech, nextBestActions }, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch (error) {
     console.error('ELP voice activation briefing failed', error);
     return NextResponse.json({ error: 'Activation briefing is temporarily unavailable.' }, {

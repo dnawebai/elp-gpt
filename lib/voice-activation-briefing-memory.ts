@@ -37,6 +37,8 @@ export type AdaptiveVoiceActivationBriefing = VoiceActivationBriefing & {
   shouldSpeak: boolean;
   changeState: 'initial' | 'changed' | 'unchanged';
   changes: Record<ChangeKind, number>;
+  changedKeys: string[];
+  resolvedKeys: string[];
   acknowledgement?: string;
   previousGeneratedAt?: string;
 };
@@ -323,6 +325,8 @@ export async function prepareAdaptiveVoiceActivationBriefing(
     shouldSpeak,
     changeState: !previous ? 'initial' : shouldSpeak ? 'changed' : 'unchanged',
     changes: counts,
+    changedKeys: changedEntries.map((item) => item.key),
+    resolvedKeys: resolvedEntries.map((item) => item.key),
     ...(acknowledgement ? { acknowledgement } : {}),
     ...(previous?.generatedAt ? { previousGeneratedAt: previous.generatedAt } : {}),
   };

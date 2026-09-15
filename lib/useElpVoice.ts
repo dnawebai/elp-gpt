@@ -91,6 +91,7 @@ For a post-meeting email request such as "send the first follow-up from yesterda
 For a calendar follow-up such as "schedule the follow-up call Tuesday at 2 PM", call jarbis_command with command="meeting_schedule", meeting set to the relevant meeting reference, scheduleRequest containing the user's date/time wording, durationMinutes if stated, and inviteParticipants=true unless the user explicitly says not to invite them. The server resolves relative dates against the browser timezone and returns an exact approval-required calendar action.
 When the user asks what ELP is doing about open obligations, what commitments need action, or what autonomous work is waiting, use command="fulfilment". When the user explicitly asks ELP to work through, advance, review, or fulfil open commitments now, use command="fulfilment_run". ELP may autonomously perform read-only research and internal preparation, but any external write returned by fulfilment remains approval-required. Describe only the single exact pending action being proposed and ask for approval.
 When the user asks what problems are coming, what may go wrong next, what the next seven days look like, or what ELP can prevent before it becomes urgent, use command="anticipatory". When the user explicitly asks to rescan, forecast, or look ahead now, use command="anticipatory_run". Present forecasts as evidence-backed early warnings with confidence, never as certainty.
+When the user asks what to do next, what deserves attention first, or for priority actions, use list_next_best_actions. Read the ranked Do now, Approve, Delegate, and Monitor queue. The queue is advisory only and never constitutes consent or execution. For an Approve item, identify the exact pending approval and require a separate explicit spoken approval before calling approve_pending_approval. For Do now or Delegate items, wait for a separate user command and route any resulting consequential write through the existing governed action flow.
 When the user asks about waiting approvals, use list_pending_approvals. Read back the numbered redacted list with summary, tool, risk, and expiry. Never expose sealed arguments or tokens.
 When the user explicitly approves a listed durable approval, call approve_pending_approval with its one-based index or continuation_id. Before calling it, identify the exact summary, tool, and risk being approved. Never infer approval from silence, context, or an earlier unrelated yes. High-risk actions may trigger a passkey challenge and are not complete until the execution result confirms success.
 When the user explicitly rejects a listed durable approval, call reject_pending_approval with its one-based index or continuation_id. Never substitute one pending approval for another if the queue changes; relist when selection is ambiguous.
@@ -127,6 +128,7 @@ const UI_FUNCTIONS = [
       required: ['command'],
     },
   },
+  { name: 'list_next_best_actions', description: 'List ELP ranked next-best actions as Do now, Approve, Delegate, or Monitor. This is recommendation-only and never executes an action.', parameters: { type: 'object', properties: {} } },
   { name: 'list_pending_approvals', description: 'List durable AGI approvals waiting for the owner. Returns only redacted summaries, tool names, risk, and expiry.', parameters: { type: 'object', properties: {} } },
   { name: 'approve_pending_approval', description: 'Approve and execute one durable pending approval only after the user explicitly gives spoken approval.', parameters: { type: 'object', properties: { continuation_id: { type: 'string' }, index: { type: 'number', description: 'One-based index from the latest pending approval list.' } } } },
   { name: 'reject_pending_approval', description: 'Reject one durable pending approval only after the user explicitly gives spoken rejection.', parameters: { type: 'object', properties: { continuation_id: { type: 'string' }, index: { type: 'number', description: 'One-based index from the latest pending approval list.' } } } },
@@ -354,6 +356,12 @@ export function useElpVoice({ enabled, sessionId, onMessage, onCommand, onError 
               if (!query) result = { ok: false, error: 'A skill query is required.' };
               else { const response = await fetch(`/api/skills?q=${encodeURIComponent(query)}`, { cache: 'no-store' }); result = response.ok ? await response.json() : { ok: false, error: 'Skill discovery unavailable.' }; }
             } else if (fn.name === 'jarbis_command') result = await runJarbisVoiceCommand(input);
+            else if (fn.name === 'list_next_best_actions') {
+              let timezone: string | undefined;
+              try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { timezone = undefined; }
+              const response = await fetch('/api/voice/next-best-actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timezone }), cache: 'no-store' });
+              result = response.ok ? await response.json() : { ok: false, error: 'Next-best-action queue unavailable.' };
+            }
             else if (fn.name === 'list_pending_approvals') result = await listPendingApprovals();
             else if (fn.name === 'approve_pending_approval') result = await continueDurableApproval(input, 'approve');
             else if (fn.name === 'reject_pending_approval') result = await continueDurableApproval(input, 'reject');
