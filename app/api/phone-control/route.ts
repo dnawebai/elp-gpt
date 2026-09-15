@@ -28,13 +28,29 @@ export async function POST(request: Request) {
   }
 
   try {
+    const readiness = await getPhoneReadiness(context.profileId);
+    const requestedFrom = typeof body.fromNumber === 'string' ? body.fromNumber.trim() : '';
+    const preferred = readiness.phoneNumbers.find((number) => number.number === requestedFrom && number.outboundAgentId)
+      || readiness.phoneNumbers.find((number) => Boolean(number.outboundAgentId));
+    const fromNumber = requestedFrom || preferred?.number || process.env.ELP_RETELL_FROM_NUMBER?.trim() || '';
+    const agentId = typeof body.agentId === 'string' && body.agentId.trim()
+      ? body.agentId.trim()
+      : preferred?.outboundAgentId;
+
+    if (!fromNumber) {
+      return NextResponse.json(
+        { error: 'No outbound ELP caller ID is configured.' },
+        { status: 503, headers: { 'Cache-Control': 'no-store, private' } },
+      );
+    }
+
     const candidateSlots = Array.isArray(body.candidateSlots)
       ? body.candidateSlots.filter((value): value is string => typeof value === 'string')
       : [];
     const action = prepareOutboundPhoneAction({
-      fromNumber: typeof body.fromNumber === 'string' ? body.fromNumber : '',
+      fromNumber,
       toNumber: typeof body.toNumber === 'string' ? body.toNumber : '',
-      agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
+      agentId,
       purpose: typeof body.purpose === 'string' ? body.purpose : undefined,
       principalName: typeof body.principalName === 'string' ? body.principalName : undefined,
       businessName: typeof body.businessName === 'string' ? body.businessName : undefined,
@@ -52,6 +68,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       pendingAction: action,
+      callerId: fromNumber,
       preparedByPrincipalId: context.principal.id,
       policy: 'Outbound calls remain external commitments and require the signed ELP approval flow.',
     }, { headers: { 'Cache-Control': 'no-store, private' } });
