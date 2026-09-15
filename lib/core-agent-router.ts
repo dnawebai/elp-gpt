@@ -147,12 +147,14 @@ export async function routeCoreAgent(args: {
 
   if (mode === 'serious') {
     const result = await runAgiCore({ profileId: args.profileId, objective, maxAgents: 8 });
+    const runId = randomUUID();
     const governedActions = args.authorityContext && result.actionIntents.length
       ? await orchestrateAgentActions({
           authority: args.authorityContext,
           sessionId: args.sessionId,
           objective,
           intents: result.actionIntents,
+          sourceRunId: runId,
           autoExecuteRead: true,
           autoExecuteStandingWrite: true,
         })
@@ -162,7 +164,6 @@ export async function routeCoreAgent(args: {
       ? 'Governed execution: action intents were identified, but an authenticated authority session is required before they can be planned or executed.'
       : '';
     const responseText = [result.synthesis, executionSummary || authorityNotice].filter(Boolean).join('\n\n');
-    const runId = randomUUID();
     await persistAgentRun(args.profileId, {
       id: runId,
       mode: 'serious',
