@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { persistAgentRun } from '@/lib/agent-run-memory';
+import { runUnifiedAgentSwarm } from '@/lib/agent-swarm';
 import { runSlashyMission } from '@/lib/slashy-agent';
 import { runVellumWorkflow, type VellumWorkflow } from '@/lib/vellum-agent';
 
@@ -7,24 +8,29 @@ export type CoreAgentRouteResult =
   | { handled: false }
   | {
       handled: true;
-      mode: 'slashy' | 'vellum';
+      mode: 'slashy' | 'vellum' | 'serious';
       text: string;
       metadata: Record<string, unknown>;
     };
 
-function cleanObjective(input: string, mode: 'slashy' | 'vellum') {
+type CoreAgentMode = 'slashy' | 'vellum' | 'serious';
+
+function cleanObjective(input: string, mode: CoreAgentMode) {
   const prefixes = mode === 'slashy'
     ? [/^\s*\/slashy\s*/i, /^\s*(use|ask|run)\s+slashy(?:\s+agent)?\s*[:,-]?\s*/i, /^\s*slashy\s*[:,-]?\s*/i]
-    : [/^\s*\/vellum\s*/i, /^\s*(use|ask|run)\s+(this\s+through\s+)?vellum(?:\s+agent)?\s*[:,-]?\s*/i, /^\s*vellum\s*[:,-]?\s*/i];
+    : mode === 'vellum'
+      ? [/^\s*\/vellum\s*/i, /^\s*(use|ask|run)\s+(this\s+through\s+)?vellum(?:\s+agent)?\s*[:,-]?\s*/i, /^\s*vellum\s*[:,-]?\s*/i]
+      : [/^\s*\/serious\s*/i, /^\s*(?:use|run|activate|enable)\s+serious(?:\s+multi[- ]?agent)?\s+mode\s*[:,-]?\s*/i, /^\s*serious(?:\s+mode)?\s*[:,-]?\s*/i];
   let value = input.trim();
   for (const pattern of prefixes) value = value.replace(pattern, '');
   return value.trim() || input.trim();
 }
 
-function detectMode(input: string): 'slashy' | 'vellum' | null {
+function detectMode(input: string): CoreAgentMode | null {
   const q = input.trim().toLowerCase();
   if (/^\/slashy\b|\b(?:use|ask|run)\s+slashy\b|^slashy\s*[:,-]/i.test(input)) return 'slashy';
   if (/^\/vellum\b|\b(?:use|ask)\s+vellum\b|\brun\s+(?:this\s+)?through\s+vellum\b|^vellum\s*[:,-]/i.test(input)) return 'vellum';
+  if (/^\/serious\b|\b(?:use|run|activate|enable)\s+serious(?:\s+multi[- ]?agent)?\s+mode\b|^serious(?:\s+mode)?\s*[:,-]/i.test(input)) return 'serious';
 
   const slashySignals = [
     /\bdropped balls?\b/,
@@ -41,6 +47,13 @@ function detectMode(input: string): 'slashy' | 'vellum' | null {
     /\btrace (?:this|the) agent workflow\b/,
   ];
   if (vellumSignals.some((pattern) => pattern.test(q))) return 'vellum';
+
+  const seriousSignals = [
+    /\bmulti[- ]agent (?:analysis|strategy|review|plan)\b/,
+    /\b(?:assemble|run|use) (?:the )?(?:expert|specialist) swarm\b/,
+    /\bget (?:all|multiple) (?:experts|agents|specialists) to (?:analyse|analyze|review|solve)\b/,
+  ];
+  if (seriousSignals.some((pattern) => pattern.test(q))) return 'serious';
   return null;
 }
 
@@ -120,6 +133,38 @@ export async function routeCoreAgent(args: {
         runId,
         droppedBallCount: result.droppedBallSignals.length,
         proposedWriteCount: result.proposedWriteTools.length,
+      },
+    };
+  }
+
+  if (mode === 'serious') {
+    const result = await runUnifiedAgentSwarm({ objective });
+    const runId = randomUUID();
+    await persistAgentRun(args.profileId, {
+      id: runId,
+      mode: 'serious',
+      objective,
+      status: result.findings.some((finding) => finding.status === 'failed') ? 'completed-with-partial-agent-failures' : 'completed',
+      summary: result.synthesis,
+      trace: result.trace,
+      metadata: {
+        agents: result.agents.map((agent) => ({ id: agent.id, name: agent.name, domain: agent.domain })),
+        relevantSkills: result.relevantSkills,
+        skillCandidates: result.skillCandidates,
+        failedAgents: result.findings.filter((finding) => finding.status === 'failed').map((finding) => finding.agentId),
+      },
+      generatedAt: result.generatedAt,
+    });
+    return {
+      handled: true,
+      mode: 'serious',
+      text: result.synthesis,
+      metadata: {
+        runId,
+        agentCount: result.agents.length,
+        completedAgents: result.findings.filter((finding) => finding.status === 'completed').length,
+        failedAgents: result.findings.filter((finding) => finding.status === 'failed').length,
+        skillCandidates: result.skillCandidates,
       },
     };
   }
