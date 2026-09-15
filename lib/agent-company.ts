@@ -1,4 +1,13 @@
-export type CompanyId = 'shared' | 'iquash' | 'mezcalsearch' | 'dnaweb' | 'elp_owner';
+export type CompanyId =
+  | 'shared'
+  | 'iquash'
+  | 'mezcalsearch'
+  | 'dnaweb'
+  | 'elp_owner'
+  | 'elp_gpt'
+  | 'elp_ventures'
+  | 'grus'
+  | 'opus';
 
 export type CompanyGoal = {
   company: CompanyId;
@@ -66,4 +75,12 @@ export function listCompanyPositions() {
 
 export function listAgentPerformance() {
   return companyRequest('/v1/agents/performance');
+}
+
+export function listProjectAttachments() {
+  return companyRequest('/v1/projects/attachments');
+}
+
+export function getProjectAttachment(company: CompanyId) {
+  return companyRequest(`/v1/projects/${encodeURIComponent(company)}/attachment`);
 }
