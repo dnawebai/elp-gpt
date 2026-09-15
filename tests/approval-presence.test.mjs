@@ -32,16 +32,20 @@ test('high-risk continuation approval remains on the passkey step-up path', () =
   assert.match(bridge, /high-risk-approval/);
 });
 
-test('persisted agent continuations create immediate approval notifications', () => {
+test('persisted agent continuations create one immediate ledger-compatible approval notification', () => {
   assert.match(continuations, /publishApprovalPresenceNotification/);
+  assert.match(continuations, /nonce: envelope\.nonce/);
   assert.match(notifications, /kind: 'approval'/);
-  assert.match(notifications, /source: 'approval-continuation'/);
+  assert.match(notifications, /source: 'approval'/);
+  assert.match(notifications, /sourceId: input\.nonce/);
+  assert.match(notifications, /approval\|\$\{nonce\}\|approval/);
   assert.match(notifications, /resolveMissing: false/);
   assert.match(notifications, /Open Approval Center/);
 });
 
-test('terminal continuation states resolve their presence notification', () => {
-  assert.match(continuations, /resolveApprovalPresenceNotification/);
-  assert.match(notifications, /item\.source === 'approval-continuation'/);
+test('terminal continuation states resolve their approval notification', () => {
+  assert.match(continuations, /resolveApprovalPresenceNotification\(profileId, found\.record\.nonce\)/);
+  assert.match(notifications, /item\.source === 'approval'/);
+  assert.match(notifications, /item\.sourceId === nonce/);
   assert.match(notifications, /updateNotification\(profileId, item\.id, 'resolved'\)/);
 });
