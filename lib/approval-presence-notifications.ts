@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
+import type { ActionRisk } from '@/lib/actions';
+import { deliverPriorityNotifications } from '@/lib/notification-delivery';
 import {
   getNotificationCenter,
   upsertNotificationCandidates,
   updateNotification,
   type NotificationCandidate,
 } from '@/lib/notification-store';
-import type { ActionRisk } from '@/lib/actions';
 
 function fingerprint(nonce: string) {
   return createHash('sha256').update(`approval|${nonce}|approval`).digest('hex').slice(0, 24);
@@ -33,6 +34,9 @@ export async function publishApprovalPresenceNotification(profileId: string, inp
     action: `Open Approval Center to review ${input.toolSlug} and resume the exact sealed action.`,
   };
   await upsertNotificationCandidates(profileId, [candidate], { resolveMissing: false });
+  void deliverPriorityNotifications(profileId).catch((error) => {
+    console.error('Immediate approval delivery failed', error);
+  });
 }
 
 export async function resolveApprovalPresenceNotification(profileId: string, nonce: string) {
