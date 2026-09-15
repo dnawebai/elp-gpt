@@ -63,6 +63,9 @@ type ActivationBriefingResponse = {
   ok?: boolean;
   speech?: string;
   status?: 'clear' | 'attention' | 'critical';
+  shouldSpeak?: boolean;
+  changeState?: 'initial' | 'changed' | 'unchanged';
+  acknowledgement?: string;
   error?: string;
 };
 
@@ -292,6 +295,7 @@ export function useElpVoice({ enabled, sessionId, onMessage, onCommand, onError 
         reconnect: { enabled: true, maxAttempts: 8, baseDelay: 500, maxDelay: 15_000, jitter: true },
       });
       let activationBriefingSpeech = '';
+      let activationBriefingAcknowledgement = '';
       let initialGreetingDone = false;
       let activationBriefingSent = false;
       let userSpokeBeforeBriefing = false;
@@ -300,11 +304,21 @@ export function useElpVoice({ enabled, sessionId, onMessage, onCommand, onError 
         if (sessionRef.current !== session) return;
         activationBriefingSent = true;
         session.injectAgentMessage(activationBriefingSpeech);
+        const acknowledgement = activationBriefingAcknowledgement;
+        if (acknowledgement) {
+          void fetch('/api/voice/activation-briefing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'acknowledge', acknowledgement }),
+            cache: 'no-store',
+          }).catch(() => undefined);
+        }
       };
       void activationBriefingPromise.then((briefing) => {
         const speech = briefing?.speech?.trim();
-        if (!speech) return;
+        if (!speech || briefing?.shouldSpeak === false) return;
         activationBriefingSpeech = speech;
+        activationBriefingAcknowledgement = briefing?.acknowledgement?.trim() || '';
         deliverActivationBriefing();
       });
       session.on('audio', (chunk) => player.queue(chunk));

@@ -308,7 +308,7 @@ export async function prepareAdaptiveVoiceActivationBriefing(
   const shouldSpeak = !previous || changeCount > 0;
   const speech = shouldSpeak ? deltaSpeech(briefing, previous, current, changedEntries, resolvedEntries) : '';
   const acknowledgement = shouldSpeak
-    ? sealServerEnvelope<BriefingAcknowledgement>({
+    ? sealServerEnvelope({
         version: 1,
         profileId: context.profileId,
         principalId: context.principal.id,
