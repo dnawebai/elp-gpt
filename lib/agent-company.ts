@@ -63,3 +63,7 @@ export function listCompanyEvents() {
 export function listCompanyPositions() {
   return companyRequest('/companies');
 }
+
+export function listAgentPerformance() {
+  return companyRequest('/v1/agents/performance');
+}
