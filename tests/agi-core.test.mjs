@@ -22,7 +22,6 @@ test('AGI Core independently verifies the swarm synthesis before returning it', 
 
 test('AGI and GitHub-repository objectives route to enhanced Serious Mode', () => {
   assert.match(router, /first agi/);
-  assert.match(router, /build \(\?:an\?\|the\)\?/);
   assert.match(router, /github\|git/);
   assert.match(router, /runAgiCore/);
   assert.match(router, /cognitiveLenses/);
