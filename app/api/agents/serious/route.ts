@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
     const context = typeof body?.context === 'string' ? body.context.trim().slice(0, 6000) : undefined;
     const maxAgents = typeof body?.maxAgents === 'number' ? Math.max(3, Math.min(body.maxAgents, 8)) : undefined;
     const sessionId = sanitizeId(body?.sessionId, 'serious');
+    const runId = randomUUID();
 
     const result = await runAgiCore({ profileId: profile.profileId, objective, context, maxAgents });
     const authority = await resolveZeroTrustAuthority(request).catch(() => null);
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
           objective,
           context,
           intents: result.actionIntents,
+          sourceRunId: runId,
           autoExecuteRead: body?.autoExecuteRead !== false,
           autoExecuteStandingWrite: body?.autoExecuteStandingWrite !== false,
         })
@@ -57,7 +59,6 @@ export async function POST(request: NextRequest) {
       : '';
     const responseText = [result.synthesis, executionSummary || authorityNotice].filter(Boolean).join('\n\n');
 
-    const runId = randomUUID();
     await persistAgentRun(profile.profileId, {
       id: runId,
       mode: 'serious',
