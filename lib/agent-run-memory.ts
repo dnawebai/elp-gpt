@@ -1,6 +1,6 @@
 import { Honcho } from '@honcho-ai/sdk';
 
-export type AgentRunMode = 'slashy' | 'vellum';
+export type AgentRunMode = 'slashy' | 'vellum' | 'mesh';
 
 export type AgentRunRecord = {
   id: string;
