@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   const contentLength = Number(request.headers.get('content-length') || '0');
-  if (contentLength > 512_000) {
+  if (contentLength > 384_000) {
     return Response.json({ error: { message: 'Voice reasoning request too large.' } }, { status: 413 });
   }
 
@@ -39,16 +39,16 @@ export async function POST(request: Request) {
   const history = body.messages
     .filter((message): message is Record<string, unknown> => Boolean(message && typeof message === 'object'))
     .filter((message) => message.role !== 'system')
-    .slice(-48);
+    .slice(-24);
 
   const system = await buildElpSystemPrompt(claims.profileId, claims.sessionId);
-  const maxTokens = Math.max(64, Math.min(Number(body.max_tokens) || 900, 1600));
+  const maxTokens = Math.max(64, Math.min(Number(body.max_tokens) || 600, 1000));
   const stream = body.stream !== false;
 
   const commonBody: Record<string, unknown> = {
     messages: [{ role: 'system', content: system }, ...history],
     stream,
-    temperature: typeof body.temperature === 'number' ? Math.min(Math.max(body.temperature, 0), 1) : 0.3,
+    temperature: typeof body.temperature === 'number' ? Math.min(Math.max(body.temperature, 0), 1) : 0.25,
     max_tokens: maxTokens,
   };
 
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
           ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}),
         },
         body: JSON.stringify({ ...commonBody, model: provider.model }),
-        signal: AbortSignal.timeout(provider.name === 'hermes' ? 15_000 : 35_000),
+        signal: AbortSignal.timeout(provider.name === 'hermes' ? 10_000 : 24_000),
       });
 
       if (!upstream.ok) {
