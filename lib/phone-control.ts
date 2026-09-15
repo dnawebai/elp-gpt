@@ -5,6 +5,8 @@ export type PhoneReadiness = {
   available: boolean;
   phoneNumbers: Array<{
     number: string;
+    type?: string;
+    ready: boolean;
     inboundAgentId?: string;
     outboundAgentId?: string;
     inboundAgentIds?: string[];
@@ -55,6 +57,7 @@ export async function getPhoneReadiness(profileId: string): Promise<PhoneReadine
       executeComposioTool({ toolSlug: 'RETELLAI_LIST_AGENTS', arguments: {}, profileId }),
     ]);
 
+    const customTelephonyReady = process.env.ELP_CUSTOM_TELEPHONY_READY === 'true';
     const numberObjects = walkObjects(numbersRaw).filter(
       (item) => typeof item.phone_number === 'string' || typeof item.phoneNumber === 'string',
     );
@@ -63,8 +66,12 @@ export async function getPhoneReadiness(profileId: string): Promise<PhoneReadine
       .map((item) => {
         const inboundAgentIds = readAgentIds(item, 'inbound');
         const outboundAgentIds = readAgentIds(item, 'outbound');
+        const type = typeof item.phone_number_type === 'string' ? item.phone_number_type : undefined;
+        const ready = Boolean(outboundAgentIds[0]) && (type !== 'custom' || customTelephonyReady);
         return {
           number: String(item.phone_number || item.phoneNumber),
+          ...(type ? { type } : {}),
+          ready,
           ...(inboundAgentIds[0] ? { inboundAgentId: inboundAgentIds[0] } : {}),
           ...(outboundAgentIds[0] ? { outboundAgentId: outboundAgentIds[0] } : {}),
           ...(inboundAgentIds.length ? { inboundAgentIds } : {}),
@@ -89,7 +96,7 @@ export async function getPhoneReadiness(profileId: string): Promise<PhoneReadine
 
     return {
       configured: true,
-      available: phoneNumbers.some((number) => Boolean(number.outboundAgentId)) && agents.length > 0,
+      available: phoneNumbers.some((number) => number.ready) && agents.length > 0,
       phoneNumbers,
       agents,
     };
