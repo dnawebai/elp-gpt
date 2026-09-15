@@ -57,6 +57,28 @@ test('mobile companion uses secure enrollment, biometrics and push registration'
   assert.match(text, /\/api\/mobile-companion/);
 });
 
+test('mobile voice uses companion auth, bounded audio and server-side Deepgram', async () => {
+  const [app, route, deepgram, policy] = await Promise.all([
+    source('companion/mobile/app/index.js'),
+    source('app/api/mobile-voice/route.ts'),
+    source('lib/deepgram.ts'),
+    source('lib/api-authority-policy.ts'),
+  ]);
+  assert.match(app, /useAudioRecorder/);
+  assert.match(app, /authenticated\('Start ELP voice session'\)/);
+  assert.match(app, /\/api\/mobile-voice/);
+  assert.match(app, /deviceContext/);
+  assert.match(route, /verifyCompanionAccess/);
+  assert.match(route, /MAX_AUDIO_BYTES/);
+  assert.match(route, /transcribeDeepgramAudio/);
+  assert.match(route, /synthesizeDeepgramSpeech/);
+  assert.match(deepgram, /\/v1\/listen/);
+  assert.match(deepgram, /\/v2\/speak/);
+  assert.match(deepgram, /flux-colin-en/);
+  assert.match(policy, /'\/api\/mobile-voice'/);
+  assert.doesNotMatch(app, /DEEPGRAM_API_KEY/);
+});
+
 test('external audit export verifies the chain and signs batches', async () => {
   const text = await source('lib/security-audit-export.ts');
   assert.match(text, /verifySecurityAuditChain/);

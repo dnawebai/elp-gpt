@@ -21,7 +21,34 @@ export type DeepgramRuntimeConfig = {
   managedThinkModel: string;
 };
 
+export type DeepgramTranscription = {
+  transcript: string;
+  confidence: number | null;
+};
+
+export type DeepgramSpeech = {
+  audio: Uint8Array;
+  contentType: string;
+  spokenText: string;
+  truncated: boolean;
+};
+
 const FLUX_SPEEDS = [0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15] as const;
+const MOBILE_SPEECH_MAX_CHARS = 2200;
+const MOBILE_SPEECH_MAX_BYTES = 4 * 1024 * 1024;
+const AUDIO_MIME_TYPES = new Set([
+  'audio/aac',
+  'audio/flac',
+  'audio/m4a',
+  'audio/mp3',
+  'audio/mp4',
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/opus',
+  'audio/wav',
+  'audio/webm',
+  'audio/x-m4a',
+]);
 
 // ELP has one permanent signature voice. Do not vary it by environment,
 // deployment, session, user request, or language detection.
@@ -53,6 +80,17 @@ function csv(value: string | undefined, fallback: string[]) {
 function normalizeHttpBase(value: string | undefined) {
   const base = (value || 'https://api.deepgram.com').trim().replace(/\/$/, '');
   return /^https:\/\//i.test(base) ? base : 'https://api.deepgram.com';
+}
+
+function normalizeAudioMime(value: string) {
+  const clean = value.toLowerCase().split(';')[0]?.trim() || '';
+  return AUDIO_MIME_TYPES.has(clean) ? clean : 'audio/mp4';
+}
+
+function deepgramApiKey() {
+  const apiKey = process.env.DEEPGRAM_API_KEY?.trim();
+  if (!apiKey) throw new Error('Deepgram is not configured.');
+  return apiKey;
 }
 
 export function getDeepgramRuntimeConfig(): DeepgramRuntimeConfig {
@@ -90,9 +128,7 @@ export function isDeepgramConfigured() {
 }
 
 export async function grantDeepgramToken(ttlSeconds = 300) {
-  const apiKey = process.env.DEEPGRAM_API_KEY?.trim();
-  if (!apiKey) throw new Error('Deepgram is not configured.');
-
+  const apiKey = deepgramApiKey();
   const ttl = Math.round(Math.min(3600, Math.max(30, ttlSeconds)));
   const config = getDeepgramRuntimeConfig();
   const response = await fetch(`${config.apiBaseUrl}/v1/auth/grant`, {
@@ -118,6 +154,81 @@ export async function grantDeepgramToken(ttlSeconds = 300) {
   return {
     accessToken: data.access_token,
     expiresIn: typeof data.expires_in === 'number' ? data.expires_in : ttl,
+  };
+}
+
+export async function transcribeDeepgramAudio(audio: ArrayBuffer, mimeType: string): Promise<DeepgramTranscription> {
+  if (!(audio instanceof ArrayBuffer) || audio.byteLength === 0) throw new Error('Recorded audio is empty.');
+  const apiKey = deepgramApiKey();
+  const config = getDeepgramRuntimeConfig();
+  const model = (process.env.ELP_MOBILE_TRANSCRIBE_MODEL || 'nova-3').trim().slice(0, 80) || 'nova-3';
+  const query = new URLSearchParams({ model, smart_format: 'true', detect_language: 'true' });
+  if (model.startsWith('nova-3')) {
+    for (const term of config.keyterms.slice(0, 12)) query.append('keyterm', term);
+  }
+  const response = await fetch(`${config.apiBaseUrl}/v1/listen?${query.toString()}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Token ${apiKey}`,
+      'Content-Type': normalizeAudioMime(mimeType),
+    },
+    body: audio,
+    cache: 'no-store',
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    console.error('Deepgram mobile transcription failed', response.status, detail.slice(0, 300));
+    throw new Error(`Voice transcription failed (${response.status}).`);
+  }
+  const data = (await response.json()) as {
+    results?: { channels?: Array<{ alternatives?: Array<{ transcript?: string; confidence?: number }> }> };
+  };
+  const alternative = data.results?.channels?.[0]?.alternatives?.[0];
+  const transcript = alternative?.transcript?.trim() || '';
+  return {
+    transcript,
+    confidence: typeof alternative?.confidence === 'number' && Number.isFinite(alternative.confidence)
+      ? Math.max(0, Math.min(1, alternative.confidence))
+      : null,
+  };
+}
+
+export async function synthesizeDeepgramSpeech(text: string): Promise<DeepgramSpeech> {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (!clean) throw new Error('Speech synthesis requires text.');
+  const spokenText = clean.slice(0, MOBILE_SPEECH_MAX_CHARS);
+  const apiKey = deepgramApiKey();
+  const config = getDeepgramRuntimeConfig();
+  const query = new URLSearchParams({
+    model: ELP_SIGNATURE_VOICE,
+    encoding: 'mp3',
+    speed: String(ELP_SIGNATURE_SPEED),
+  });
+  const response = await fetch(`${config.apiBaseUrl}/v2/speak?${query.toString()}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Token ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ text: spokenText }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    console.error('Deepgram mobile speech synthesis failed', response.status, detail.slice(0, 300));
+    throw new Error(`Voice synthesis failed (${response.status}).`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  if (!arrayBuffer.byteLength || arrayBuffer.byteLength > MOBILE_SPEECH_MAX_BYTES) {
+    throw new Error('Voice synthesis returned an invalid audio payload.');
+  }
+  return {
+    audio: new Uint8Array(arrayBuffer),
+    contentType: response.headers.get('content-type') || 'audio/mpeg',
+    spokenText,
+    truncated: spokenText.length < clean.length,
   };
 }
 
