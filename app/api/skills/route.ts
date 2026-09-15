@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const query = (url.searchParams.get('q') || '').trim();
-  const skills = query ? matchSkills(query, 12) : ELP_SKILLS;
+  const skills = query ? matchSkills(query, 24) : ELP_SKILLS;
 
   return NextResponse.json(
     {
