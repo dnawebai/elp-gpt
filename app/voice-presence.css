@@ -1,0 +1,282 @@
+/* ELP realtime presence layer.
+   Direction: 21st.dev voice-orb / AI voice-input interaction pattern, adapted to
+   the existing HUD with transform/opacity animations only for low mobile GPU cost.
+   The parent .elp-shell already exposes mode-listening / mode-thinking /
+   mode-speaking, so the interface changes instantly with the live agent state. */
+
+.hud {
+  --presence-cyan: 0, 244, 255;
+  --presence-blue: 39, 154, 255;
+  --presence-violet: 126, 92, 255;
+  transform: translateZ(0);
+  will-change: transform, filter;
+}
+
+.hud::before,
+.hud::after {
+  content: "";
+  position: absolute;
+  inset: 17%;
+  z-index: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateZ(0) scale(.82);
+  will-change: transform, opacity;
+}
+
+/* Inner living plasma: always barely visible, then becomes expressive by state. */
+.hud::before {
+  background:
+    radial-gradient(circle at 35% 30%, rgba(var(--presence-cyan), .22), transparent 25%),
+    radial-gradient(circle at 68% 66%, rgba(var(--presence-blue), .16), transparent 28%),
+    radial-gradient(circle at 50% 50%, rgba(var(--presence-cyan), .11), rgba(0, 10, 14, .02) 54%, transparent 72%);
+  filter: blur(7px);
+}
+
+/* Fast orbital energy shell. */
+.hud::after {
+  inset: 12%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0 8%,
+    rgba(var(--presence-cyan), .86) 10% 12%,
+    transparent 14% 31%,
+    rgba(var(--presence-blue), .58) 33% 36%,
+    transparent 39% 60%,
+    rgba(var(--presence-cyan), .78) 62% 65%,
+    transparent 68% 83%,
+    rgba(var(--presence-violet), .44) 85% 88%,
+    transparent 91% 100%
+  );
+  -webkit-mask: radial-gradient(circle, transparent 0 78%, #000 79.5% 83%, transparent 84.5%);
+  mask: radial-gradient(circle, transparent 0 78%, #000 79.5% 83%, transparent 84.5%);
+  filter: drop-shadow(0 0 10px rgba(var(--presence-cyan), .58));
+}
+
+/* LISTENING — visibly breathes and contracts toward the user's voice. */
+.mode-listening .hud::before {
+  opacity: .72;
+  animation: elpListenCore .68s ease-in-out infinite alternate;
+}
+
+.mode-listening .hud::after {
+  opacity: .62;
+  animation: elpListenOrbit 2.9s linear infinite;
+}
+
+.mode-listening .hud-center {
+  animation: elpListenCenter .72s cubic-bezier(.4, 0, .2, 1) infinite alternate;
+}
+
+.mode-listening .ring-inner {
+  animation: elpListenRing 1.05s ease-in-out infinite alternate !important;
+}
+
+.mode-listening .voice-wave i {
+  transform-origin: center;
+  animation: elpUserBar .46s ease-in-out infinite alternate !important;
+}
+.mode-listening .voice-wave i:nth-child(2) { animation-delay: -.29s !important; }
+.mode-listening .voice-wave i:nth-child(3) { animation-delay: -.11s !important; }
+.mode-listening .voice-wave i:nth-child(4) { animation-delay: -.37s !important; }
+.mode-listening .voice-wave i:nth-child(5) { animation-delay: -.18s !important; }
+.mode-listening .voice-wave i:nth-child(6) { animation-delay: -.31s !important; }
+.mode-listening .voice-wave i:nth-child(7) { animation-delay: -.08s !important; }
+
+.mode-listening .voice-state {
+  color: #a6fbff;
+  text-shadow: 0 0 12px rgba(var(--presence-cyan), .72);
+}
+
+/* THINKING — tighter, faster orbital motion with a distinct violet/cyan phase. */
+.mode-thinking .hud {
+  animation: elpThinkBody 1.35s ease-in-out infinite;
+}
+
+.mode-thinking .hud::before {
+  opacity: .88;
+  background:
+    radial-gradient(circle at 34% 33%, rgba(var(--presence-violet), .34), transparent 25%),
+    radial-gradient(circle at 66% 62%, rgba(var(--presence-cyan), .30), transparent 30%),
+    radial-gradient(circle, rgba(var(--presence-blue), .12), transparent 66%);
+  animation: elpThinkPlasma 1.15s ease-in-out infinite alternate;
+}
+
+.mode-thinking .hud::after {
+  opacity: .92;
+  animation: elpThinkOrbit 1.05s linear infinite;
+}
+
+.mode-thinking .ring-arc-a {
+  animation-duration: 3.2s !important;
+  filter: drop-shadow(0 0 9px rgba(var(--presence-cyan), .78));
+}
+
+.mode-thinking .ring-arc-b {
+  animation-duration: 4.1s !important;
+}
+
+.mode-thinking .ring-ticks {
+  animation-duration: 5.4s !important;
+  opacity: 1;
+}
+
+.mode-thinking .voice-wave i {
+  animation: elpThinkBar .62s ease-in-out infinite alternate !important;
+}
+.mode-thinking .voice-wave i:nth-child(odd) { animation-delay: -.31s !important; }
+.mode-thinking .voice-wave i:nth-child(even) { animation-delay: -.12s !important; }
+
+.mode-thinking .voice-state {
+  color: #c5b7ff;
+  text-shadow: 0 0 12px rgba(var(--presence-violet), .7);
+}
+
+/* SPEAKING — largest movement so it is unmistakable that ELP is talking. */
+.mode-speaking .hud {
+  animation: elpSpeakBody .52s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 22px rgba(var(--presence-cyan), .18));
+}
+
+.mode-speaking .hud::before {
+  opacity: 1;
+  filter: blur(10px);
+  animation: elpSpeakCore .48s ease-in-out infinite alternate;
+}
+
+.mode-speaking .hud::after {
+  opacity: 1;
+  animation: elpSpeakOrbit 2.2s linear infinite;
+}
+
+.mode-speaking .hud-center {
+  animation: elpSpeakCenter .48s cubic-bezier(.2, .75, .35, 1) infinite alternate;
+  box-shadow:
+    0 0 0 1px rgba(var(--presence-cyan), .42),
+    0 0 58px rgba(var(--presence-cyan), .36),
+    inset 0 0 42px rgba(var(--presence-cyan), .16) !important;
+}
+
+.mode-speaking .ring-inner {
+  animation: elpSpeakInner .5s ease-in-out infinite alternate !important;
+}
+
+.mode-speaking .voice-wave {
+  opacity: 1;
+  filter: drop-shadow(0 0 7px rgba(var(--presence-cyan), .9));
+}
+
+.mode-speaking .voice-wave i {
+  width: 3px;
+  animation: elpSpeakBar .30s ease-in-out infinite alternate !important;
+}
+.mode-speaking .voice-wave i:nth-child(2) { animation-delay: -.09s !important; }
+.mode-speaking .voice-wave i:nth-child(3) { animation-delay: -.21s !important; }
+.mode-speaking .voice-wave i:nth-child(4) { animation-delay: -.14s !important; }
+.mode-speaking .voice-wave i:nth-child(5) { animation-delay: -.25s !important; }
+.mode-speaking .voice-wave i:nth-child(6) { animation-delay: -.07s !important; }
+.mode-speaking .voice-wave i:nth-child(7) { animation-delay: -.18s !important; }
+
+.mode-speaking .voice-state {
+  color: #e1feff;
+  text-shadow: 0 0 14px rgba(var(--presence-cyan), .95);
+}
+
+/* Connecting gets a short high-visibility scan rather than looking frozen. */
+.hud.is-active:not(.is-listening):not(.is-speaking):not(.is-thinking)::after {
+  opacity: .52;
+  animation: elpThinkOrbit 1.65s linear infinite;
+}
+
+@keyframes elpListenCore {
+  from { transform: scale(.88); opacity: .48; }
+  to { transform: scale(1.05); opacity: .86; }
+}
+@keyframes elpListenOrbit {
+  to { transform: rotate(360deg) scale(1.02); }
+}
+@keyframes elpListenCenter {
+  from { transform: scale(.985); }
+  to { transform: scale(1.035); }
+}
+@keyframes elpListenRing {
+  from { transform: scale(.94) rotate(-3deg); opacity: .58; }
+  to { transform: scale(1.05) rotate(3deg); opacity: 1; }
+}
+@keyframes elpUserBar {
+  from { transform: scaleY(.42); opacity: .55; }
+  to { transform: scaleY(1.5); opacity: 1; }
+}
+
+@keyframes elpThinkBody {
+  0%, 100% { transform: scale(.995); }
+  50% { transform: scale(1.015); }
+}
+@keyframes elpThinkPlasma {
+  from { transform: rotate(-7deg) scale(.9); filter: blur(8px) hue-rotate(0deg); }
+  to { transform: rotate(7deg) scale(1.08); filter: blur(11px) hue-rotate(24deg); }
+}
+@keyframes elpThinkOrbit {
+  to { transform: rotate(360deg); }
+}
+@keyframes elpThinkBar {
+  from { transform: translateY(3px) scaleY(.45); opacity: .55; }
+  to { transform: translateY(-3px) scaleY(1.2); opacity: 1; }
+}
+
+@keyframes elpSpeakBody {
+  from { transform: scale(.99); }
+  to { transform: scale(1.025); }
+}
+@keyframes elpSpeakCore {
+  from { transform: scale(.9); opacity: .62; }
+  to { transform: scale(1.13); opacity: 1; }
+}
+@keyframes elpSpeakOrbit {
+  to { transform: rotate(-360deg) scale(1.02); }
+}
+@keyframes elpSpeakCenter {
+  from { transform: scale(.97); }
+  to { transform: scale(1.065); }
+}
+@keyframes elpSpeakInner {
+  from { transform: scale(.9); opacity: .54; }
+  to { transform: scale(1.12); opacity: 1; }
+}
+@keyframes elpSpeakBar {
+  from { transform: scaleY(.35); opacity: .52; }
+  to { transform: scaleY(1.9); opacity: 1; }
+}
+
+/* Mobile: make state changes more obvious without increasing the HUD footprint. */
+@media (max-width: 800px) {
+  .hud::before { inset: 18%; }
+  .hud::after { inset: 10%; }
+
+  .mode-speaking .hud-center {
+    box-shadow:
+      0 0 0 1px rgba(var(--presence-cyan), .46),
+      0 0 48px rgba(var(--presence-cyan), .38),
+      inset 0 0 34px rgba(var(--presence-cyan), .18) !important;
+  }
+}
+
+/* Respect accessibility and save battery when the user requests reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .hud,
+  .hud::before,
+  .hud::after,
+  .hud-center,
+  .hud-ring,
+  .voice-wave i {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .mode-listening .hud::before,
+  .mode-thinking .hud::before,
+  .mode-speaking .hud::before {
+    opacity: .72;
+  }
+}
