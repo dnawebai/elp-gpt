@@ -31,11 +31,13 @@ test('passkey ceremonies require user verification and bind challenges to ELP id
 });
 
 test('registered passkeys cannot be bypassed by access-grant step-up', () => {
-  const approve = read('app/api/actions/approve/route.ts');
+  const approveRoute = read('app/api/actions/approve/route.ts');
+  const approval = read('lib/action-approval.ts');
   const sessions = read('app/api/authority-session/route.ts');
   const authority = read('app/api/authority-control/route.ts');
-  assert.match(approve, /passkeys\.length && stepUp\.method !== 'passkey'/);
-  assert.match(approve, /stepUpMethod:\s*'passkey'/);
+  assert.match(approveRoute, /approveGovernedAction/);
+  assert.match(approval, /passkeys\.length && stepUp\.method !== 'passkey'/);
+  assert.match(approval, /stepUpMethod:\s*'passkey'/);
   assert.match(sessions, /registered passkey/);
   assert.match(authority, /stepUp\.method !== 'passkey'/);
 });
