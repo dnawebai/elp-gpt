@@ -1,13 +1,13 @@
 {
   "id": "/",
-  "name": "ELP GPT",
+  "name": "ELP GPT - AGI",
   "short_name": "ELP",
-  "description": "Voice-first intelligence system",
+  "description": "An evolving private intelligence system progressing toward AGI through multimodal reasoning, persistent memory, autonomous planning, and permission-gated action.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#010813",
-  "theme_color": "#010813",
+  "background_color": "#00090b",
+  "theme_color": "#00090b",
   "orientation": "any",
   "categories": ["productivity", "utilities"],
   "icons": [
