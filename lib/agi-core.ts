@@ -1,6 +1,7 @@
 import { runUnifiedAgentSwarm, type UnifiedSwarmResult } from '@/lib/agent-swarm';
 import { getExecutiveLedger } from '@/lib/executive-memory';
 import { getReasoningProviders } from '@/lib/reasoning-providers';
+import { getRepositoryRadarSnapshot, repositoryRadarToPrompt } from '@/lib/repository-radar';
 
 export type CognitiveLens = {
   id: 'repository-intelligence' | 'world-model' | 'memory-steward';
@@ -19,7 +20,7 @@ const LENSES: Array<Pick<CognitiveLens, 'id' | 'name'> & { mission: string }> = 
   {
     id: 'repository-intelligence',
     name: 'Repository Intelligence',
-    mission: 'Identify relevant open-source architectures, protocols, libraries and implementation patterns. Prefer maintained, secure, composable components. Separate what is known from what still requires live repository verification.',
+    mission: 'Identify relevant open-source architectures, protocols, libraries and implementation patterns. Prefer maintained, secure, composable components. Use the Repository Intelligence Radar when supplied, but treat it as discovery evidence rather than permission to install or execute third-party code.',
   },
   {
     id: 'world-model',
@@ -98,10 +99,15 @@ export async function runAgiCore(args: {
   const objective = clip(args.objective, 3000);
   if (!objective) throw new Error('ELP AGI Core objective is required.');
 
-  const anchors = await memoryAnchors(args.profileId);
+  const [anchors, repositoryRadar] = await Promise.all([
+    memoryAnchors(args.profileId),
+    getRepositoryRadarSnapshot(args.profileId),
+  ]);
+  const radarContext = repositoryRadarToPrompt(repositoryRadar);
   const baseContext = [
     clip(args.context, 6000),
     anchors ? `EXECUTIVE MEMORY ANCHORS:\n${anchors}` : '',
+    radarContext ? `LIVE REPOSITORY INTELLIGENCE:\n${radarContext}` : '',
   ].filter(Boolean).join('\n\n');
 
   const cognitiveLenses = await Promise.all(LENSES.map(async (lens): Promise<CognitiveLens> => {
