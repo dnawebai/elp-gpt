@@ -3,11 +3,14 @@ import {
   createCompanyGoal,
   executeCompanyJob,
   getCompanyJob,
+  getProjectAttachment,
   listAgentPerformance,
   listCompanyEvents,
   listCompanyJobs,
   listCompanyPositions,
+  listProjectAttachments,
   type CompanyGoal,
+  type CompanyId,
 } from '@/lib/agent-company';
 import { PROFILE_COOKIE, verifyProfileToken } from '@/lib/security';
 
@@ -33,6 +36,12 @@ export async function GET(request: Request) {
   const resource = url.searchParams.get('resource') || 'jobs';
   try {
     if (resource === 'positions') return NextResponse.json(await listCompanyPositions());
+    if (resource === 'attachments') return NextResponse.json(await listProjectAttachments());
+    if (resource === 'attachment') {
+      const company = url.searchParams.get('company') as CompanyId | null;
+      if (!company) return NextResponse.json({ error: 'company is required.' }, { status: 400 });
+      return NextResponse.json(await getProjectAttachment(company));
+    }
     if (resource === 'events') return NextResponse.json(await listCompanyEvents());
     if (resource === 'performance') return NextResponse.json(await listAgentPerformance());
     if (resource === 'job') {
