@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="ELP GPT">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="72%">
+      <stop offset="0" stop-color="#08333a"/>
+      <stop offset="0.48" stop-color="#031a20"/>
+      <stop offset="1" stop-color="#00090b"/>
+    </radialGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="78" fill="url(#bg)"/>
+  <g fill="none" stroke="#00eaf4" stroke-linecap="round">
+    <circle cx="256" cy="256" r="202" stroke-opacity=".28" stroke-width="3"/>
+    <circle cx="256" cy="256" r="168" stroke-opacity=".34" stroke-width="2"/>
+    <circle cx="256" cy="256" r="132" stroke-opacity=".42" stroke-width="2"/>
+    <circle cx="256" cy="256" r="96" stroke-opacity=".30" stroke-width="2"/>
+    <path d="M28 256h456M256 28v456" stroke-opacity=".36" stroke-width="2"/>
+  </g>
+  <g stroke="#00f6ff" stroke-width="10" stroke-linecap="round" filter="url(#glow)">
+    <path d="M190 125v22"/><path d="M212 112v47"/><path d="M234 99v72"/><path d="M256 84v101"/><path d="M278 100v70"/><path d="M300 112v46"/><path d="M322 126v20"/>
+  </g>
+  <text x="256" y="306" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="126" font-weight="300" letter-spacing="20" fill="#f3ffff" filter="url(#glow)">ELP</text>
+</svg>
