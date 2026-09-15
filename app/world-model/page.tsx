@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle, ArrowLeft, BrainCircuit, Building2, CircleDot, GitBranch, LoaderCircle, RefreshCw, Search, Target, UserRound, Workflow } from 'lucide-react';
 
 type NodeKind='goal'|'task'|'artifact'|'person'|'organization';
@@ -13,7 +13,7 @@ type Model={generatedAt:string;nodes:Node[];edges:Edge[];insights:Insight[];stat
 const panel={border:'1px solid #1d3d59',background:'#091827',borderRadius:16,padding:16} as const;
 const button={border:'1px solid #315874',background:'#0d2133',color:'#e8f5ff',borderRadius:999,padding:'9px 13px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7} as const;
 const input={background:'#071421',border:'1px solid #294963',color:'#eaf4ff',borderRadius:999,padding:'10px 14px',width:'100%'} as const;
-const kindIcon:Record<NodeKind,React.ReactNode>={goal:<Target size={15}/>,task:<Workflow size={15}/>,artifact:<BrainCircuit size={15}/>,person:<UserRound size={15}/>,organization:<Building2 size={15}/>};
+const kindIcon:Record<NodeKind,ReactNode>={goal:<Target size={15}/>,task:<Workflow size={15}/>,artifact:<BrainCircuit size={15}/>,person:<UserRound size={15}/>,organization:<Building2 size={15}/>};
 
 export default function WorldModelPage(){
   const [data,setData]=useState<Model|null>(null);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [query,setQuery]=useState('');const [selected,setSelected]=useState<string>('');
