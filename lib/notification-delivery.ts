@@ -11,6 +11,7 @@ import {
   type NotificationDeliveryPreferences,
 } from '@/lib/notification-delivery-policy';
 import { getNotificationCenter, type NotificationRecord } from '@/lib/notification-store';
+import { sealServerEnvelope, unsealServerEnvelope } from '@/lib/secure-envelope';
 
 export type PushSubscriptionRecord = {
   id: string;
@@ -30,6 +31,14 @@ export type DeliveryAttempt = {
   createdAt: string;
   detail?: string;
 };
+
+type PushSubscriptionSecret = {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys: { p256dh: string; auth: string };
+};
+
+const PUSH_SUBSCRIPTION_PURPOSE = 'web-push-subscription';
 
 function workspaceId() {
   return process.env.HONCHO_WORKSPACE_ID || 'elp-gpt';
@@ -119,11 +128,7 @@ function endpointHash(endpoint: string) {
   return createHash('sha256').update(endpoint).digest('hex').slice(0, 32);
 }
 
-export async function savePushSubscription(profileId: string, input: {
-  endpoint: string;
-  expirationTime?: number | null;
-  keys: { p256dh: string; auth: string };
-}) {
+export async function savePushSubscription(profileId: string, input: PushSubscriptionSecret) {
   const handles = await getDeliverySession(profileId);
   if (!handles) throw new Error('Push subscription storage is unavailable.');
   if (!input.endpoint.startsWith('https://') || !input.keys?.p256dh || !input.keys?.auth) throw new Error('Invalid push subscription.');
@@ -134,9 +139,10 @@ export async function savePushSubscription(profileId: string, input: {
   const metadata = {
     ...(existing?.metadata || {}),
     elpPushSubscription: true,
-    recordVersion: 1,
+    recordVersion: 2,
     endpointHash: hash,
-    subscriptionJson: JSON.stringify(input),
+    subscriptionSealed: sealServerEnvelope(input, PUSH_SUBSCRIPTION_PURPOSE),
+    subscriptionJson: '',
     updatedAt: now,
     createdAt: typeof existing?.metadata?.createdAt === 'string' ? existing.metadata.createdAt : now,
     active: true,
@@ -152,7 +158,7 @@ export async function removePushSubscription(profileId: string, endpoint: string
   const hash = endpointHash(endpoint);
   const page = await handles.session.messages({ size: 160, reverse: true });
   const existing = page.items.find((item) => item.metadata?.elpPushSubscription === true && item.metadata?.endpointHash === hash);
-  if (existing) await handles.session.updateMessage(existing.id, { ...existing.metadata, active: false, updatedAt: new Date().toISOString() });
+  if (existing) await handles.session.updateMessage(existing.id, { ...existing.metadata, active: false, subscriptionJson: '', updatedAt: new Date().toISOString() });
 }
 
 export async function listPushSubscriptions(profileId: string): Promise<PushSubscriptionRecord[]> {
@@ -160,19 +166,35 @@ export async function listPushSubscriptions(profileId: string): Promise<PushSubs
     const handles = await getDeliverySession(profileId);
     if (!handles) return [];
     const page = await handles.session.messages({ size: 160, reverse: true });
-    return page.items.flatMap((item) => {
-      if (item.metadata?.elpPushSubscription !== true || item.metadata?.active === false) return [];
-      const parsed = parseJson<{ endpoint: string; expirationTime?: number | null; keys: { p256dh: string; auth: string } }>(item.metadata.subscriptionJson);
-      if (!parsed?.endpoint || !parsed.keys?.p256dh || !parsed.keys?.auth) return [];
-      return [{
+    const records: PushSubscriptionRecord[] = [];
+    for (const item of page.items) {
+      if (item.metadata?.elpPushSubscription !== true || item.metadata?.active === false) continue;
+      const sealed = typeof item.metadata.subscriptionSealed === 'string' ? item.metadata.subscriptionSealed : undefined;
+      let parsed = unsealServerEnvelope<PushSubscriptionSecret>(sealed, PUSH_SUBSCRIPTION_PURPOSE);
+      if (!parsed) {
+        const legacy = parseJson<PushSubscriptionSecret>(item.metadata.subscriptionJson);
+        if (legacy?.endpoint && legacy.keys?.p256dh && legacy.keys?.auth) {
+          parsed = legacy;
+          await handles.session.updateMessage(item.id, {
+            ...item.metadata,
+            recordVersion: 2,
+            subscriptionSealed: sealServerEnvelope(legacy, PUSH_SUBSCRIPTION_PURPOSE),
+            subscriptionJson: '',
+            updatedAt: new Date().toISOString(),
+          }).catch(() => undefined);
+        }
+      }
+      if (!parsed?.endpoint || !parsed.keys?.p256dh || !parsed.keys?.auth) continue;
+      records.push({
         id: item.id,
         endpoint: parsed.endpoint,
         expirationTime: parsed.expirationTime,
         keys: parsed.keys,
         createdAt: typeof item.metadata.createdAt === 'string' ? item.metadata.createdAt : item.createdAt,
         updatedAt: typeof item.metadata.updatedAt === 'string' ? item.metadata.updatedAt : item.createdAt,
-      }];
-    });
+      });
+    }
+    return records;
   } catch (error) {
     console.error('Push subscription read failed', error);
     return [];
@@ -233,7 +255,7 @@ function pushPayload(notification: NotificationRecord) {
     title: notification.title,
     body: notification.summary,
     tag: `elp-${notification.fingerprint}`,
-    url: '/notifications',
+    url: notification.kind === 'approval' ? '/approvals' : '/notifications',
     severity: notification.severity,
     kind: notification.kind,
   });
