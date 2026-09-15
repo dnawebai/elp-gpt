@@ -1,5 +1,6 @@
 import { Honcho } from '@honcho-ai/sdk';
 import type { ActionRisk } from '@/lib/actions';
+import { publishApprovalPresenceNotification, resolveApprovalPresenceNotification } from '@/lib/approval-presence-notifications';
 import { sealServerEnvelope, unsealServerEnvelope } from '@/lib/secure-envelope';
 
 export type ApprovalContinuationStatus = 'pending' | 'executed' | 'rejected' | 'failed' | 'expired';
@@ -142,7 +143,16 @@ export async function persistApprovalContinuation(profileId: string, envelope: A
     },
   }]);
   const id = created[0]?.id;
-  return id ? { id, expiresAt } : null;
+  if (!id) return null;
+  await publishApprovalPresenceNotification(profileId, {
+    continuationId: id,
+    summary: envelope.summary,
+    toolSlug: envelope.toolSlug,
+    risk: envelope.risk,
+    ...(envelope.sourceRunId ? { sourceRunId: envelope.sourceRunId } : {}),
+    expiresAt,
+  }).catch((error) => console.error('ELP approval presence notification failed', error));
+  return { id, expiresAt };
 }
 
 async function findContinuation(profileId: string, id: string) {
@@ -194,5 +204,7 @@ export async function updateApprovalContinuation(profileId: string, id: string, 
   if (input.status === 'failed') metadata.failedAt = now;
   if (input.error) metadata.error = clip(input.error, 1000);
   const updated = await found.handles.session.updateMessage(found.message.id, metadata);
+  await resolveApprovalPresenceNotification(profileId, found.record.id)
+    .catch((error) => console.error('ELP approval presence notification resolution failed', error));
   return updated.id;
 }
