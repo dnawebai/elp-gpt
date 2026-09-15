@@ -1,30 +1,36 @@
 import { randomUUID } from 'node:crypto';
 import { persistAgentRun } from '@/lib/agent-run-memory';
+import { runCognitiveMesh } from '@/lib/cognitive-mesh';
 import { runSlashyMission } from '@/lib/slashy-agent';
 import { runVellumWorkflow, type VellumWorkflow } from '@/lib/vellum-agent';
+
+type CoreAgentMode = 'slashy' | 'vellum' | 'mesh';
 
 export type CoreAgentRouteResult =
   | { handled: false }
   | {
       handled: true;
-      mode: 'slashy' | 'vellum';
+      mode: CoreAgentMode;
       text: string;
       metadata: Record<string, unknown>;
     };
 
-function cleanObjective(input: string, mode: 'slashy' | 'vellum') {
+function cleanObjective(input: string, mode: CoreAgentMode) {
   const prefixes = mode === 'slashy'
     ? [/^\s*\/slashy\s*/i, /^\s*(use|ask|run)\s+slashy(?:\s+agent)?\s*[:,-]?\s*/i, /^\s*slashy\s*[:,-]?\s*/i]
-    : [/^\s*\/vellum\s*/i, /^\s*(use|ask|run)\s+(this\s+through\s+)?vellum(?:\s+agent)?\s*[:,-]?\s*/i, /^\s*vellum\s*[:,-]?\s*/i];
+    : mode === 'vellum'
+      ? [/^\s*\/vellum\s*/i, /^\s*(use|ask|run)\s+(this\s+through\s+)?vellum(?:\s+agent)?\s*[:,-]?\s*/i, /^\s*vellum\s*[:,-]?\s*/i]
+      : [/^\s*\/mesh\s*/i, /^\s*(use|ask|run)\s+(the\s+)?(?:elp\s+)?(?:cognitive\s+)?mesh\s*[:,-]?\s*/i, /^\s*(?:elp\s+)?(?:cognitive\s+)?mesh\s*[:,-]?\s*/i];
   let value = input.trim();
   for (const pattern of prefixes) value = value.replace(pattern, '');
   return value.trim() || input.trim();
 }
 
-function detectMode(input: string): 'slashy' | 'vellum' | null {
+function detectMode(input: string): CoreAgentMode | null {
   const q = input.trim().toLowerCase();
   if (/^\/slashy\b|\b(?:use|ask|run)\s+slashy\b|^slashy\s*[:,-]/i.test(input)) return 'slashy';
   if (/^\/vellum\b|\b(?:use|ask)\s+vellum\b|\brun\s+(?:this\s+)?through\s+vellum\b|^vellum\s*[:,-]/i.test(input)) return 'vellum';
+  if (/^\/mesh\b|\b(?:use|ask|run)\s+(?:the\s+)?(?:elp\s+)?(?:cognitive\s+)?mesh\b|\b(?:cognitive mesh|multi[- ]agent|agent swarm)\b/i.test(input)) return 'mesh';
 
   const slashySignals = [
     /\bdropped balls?\b/,
@@ -41,6 +47,16 @@ function detectMode(input: string): 'slashy' | 'vellum' | null {
     /\btrace (?:this|the) agent workflow\b/,
   ];
   if (vellumSignals.some((pattern) => pattern.test(q))) return 'vellum';
+
+  const meshSignals = [
+    /\bfirst agi\b/,
+    /\bbuild (?:an?|the)?\s*agi\b/,
+    /\belp ventures\b.*\b(?:agent|intelligence|research|repository|repositories|build)\b/,
+    /\b(?:analy[sz]e|scan|research)\b.*\b(?:github|git)\b.*\b(?:repo|repository|repositories)\b/,
+    /\b(?:all|multiple)\s+(?:ai\s+)?agents?\b.*\b(?:work|working|together|orchestrat)/,
+  ];
+  if (meshSignals.some((pattern) => pattern.test(q))) return 'mesh';
+
   return null;
 }
 
@@ -120,6 +136,43 @@ export async function routeCoreAgent(args: {
         runId,
         droppedBallCount: result.droppedBallSignals.length,
         proposedWriteCount: result.proposedWriteTools.length,
+      },
+    };
+  }
+
+  if (mode === 'mesh') {
+    const result = await runCognitiveMesh({
+      profileId: args.profileId,
+      objective,
+      maxSpecialists: 5,
+    });
+    await persistAgentRun(args.profileId, {
+      id: result.id,
+      mode: 'mesh',
+      objective,
+      status: result.execution.status,
+      summary: result.answer,
+      trace: result.execution.trace,
+      metadata: {
+        selectedAgents: result.selectedAgents,
+        workflowId: result.execution.workflowId,
+        workflowVersion: result.execution.workflowVersion,
+        iterations: result.execution.iterations,
+        totalLatencyMs: result.execution.totalLatencyMs,
+        tokenUsage: result.execution.tokenUsage || null,
+      },
+      generatedAt: result.execution.generatedAt,
+    });
+    return {
+      handled: true,
+      mode: 'mesh',
+      text: result.answer,
+      metadata: {
+        runId: result.id,
+        selectedAgents: result.selectedAgents,
+        status: result.execution.status,
+        iterations: result.execution.iterations,
+        totalLatencyMs: result.execution.totalLatencyMs,
       },
     };
   }
