@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ELP_SKILLS, matchSkills } from '@/lib/skills';
+import { ALL_ELP_SKILLS, matchAllSkills } from '@/lib/skill-registry';
 import { PROFILE_COOKIE, verifyProfileToken } from '@/lib/security';
 
 export const runtime = 'nodejs';
@@ -20,12 +20,12 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const query = (url.searchParams.get('q') || '').trim();
-  const skills = query ? matchSkills(query, 24) : ELP_SKILLS;
+  const skills = query ? matchAllSkills(query, 32) : ALL_ELP_SKILLS;
 
   return NextResponse.json(
     {
       count: skills.length,
-      total: ELP_SKILLS.length,
+      total: ALL_ELP_SKILLS.length,
       query: query || null,
       skills,
     },
