@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { classifyActionRisk } from '@/lib/actions';
 import { executeComposioTool, isComposioConfigured } from '@/lib/composio';
-import { getReasoningProviders } from '@/lib/elp';
+import { getReasoningProviders } from '@/lib/reasoning-providers';
 
 export type VellumNodeType = 'prompt' | 'agent' | 'tool' | 'condition' | 'output';
 export type VellumNode = {
