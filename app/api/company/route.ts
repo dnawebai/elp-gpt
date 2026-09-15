@@ -3,6 +3,7 @@ import {
   createCompanyGoal,
   executeCompanyJob,
   getCompanyJob,
+  listAgentPerformance,
   listCompanyEvents,
   listCompanyJobs,
   listCompanyPositions,
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
   try {
     if (resource === 'positions') return NextResponse.json(await listCompanyPositions());
     if (resource === 'events') return NextResponse.json(await listCompanyEvents());
+    if (resource === 'performance') return NextResponse.json(await listAgentPerformance());
     if (resource === 'job') {
       const jobId = url.searchParams.get('jobId');
       if (!jobId) return NextResponse.json({ error: 'jobId is required.' }, { status: 400 });
