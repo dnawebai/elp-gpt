@@ -23,6 +23,13 @@ export type DeepgramRuntimeConfig = {
 
 const FLUX_SPEEDS = [0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15] as const;
 
+// ELP has one permanent signature voice. Do not vary it by environment,
+// deployment, session, user request, or language detection.
+// Colin is Deepgram's adult British male voice with a confident,
+// authoritative, trustworthy character that fits ELP's executive persona.
+const ELP_SIGNATURE_VOICE = 'flux-colin-en';
+const ELP_SIGNATURE_SPEED = 1;
+
 function boundedNumber(value: string | undefined, fallback: number, min: number, max: number) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
@@ -50,9 +57,9 @@ function normalizeHttpBase(value: string | undefined) {
 
 export function getDeepgramRuntimeConfig(): DeepgramRuntimeConfig {
   const listenModel = process.env.ELP_LISTEN_MODEL || 'flux-general-multi';
-  const voiceModel = process.env.ELP_VOICE_MODEL || 'flux-cliff-en';
+  const voiceModel = ELP_SIGNATURE_VOICE;
   const isFluxVoice = voiceModel.startsWith('flux-');
-  const requestedSpeed = boundedNumber(process.env.ELP_VOICE_SPEED, 1.05, 0.7, 1.5);
+  const requestedSpeed = ELP_SIGNATURE_SPEED;
 
   return {
     apiBaseUrl: normalizeHttpBase(process.env.DEEPGRAM_API_URL),
