@@ -1,0 +1,185 @@
+.owner-session-notice {
+  position: fixed;
+  left: 50%;
+  bottom: max(118px, calc(env(safe-area-inset-bottom) + 96px));
+  z-index: 80;
+  width: min(560px, calc(100vw - 28px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 239, 255, .34);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(0, 17, 22, .96), rgba(0, 8, 12, .96));
+  color: #dffeff;
+  box-shadow: 0 18px 58px rgba(0, 0, 0, .48), 0 0 32px rgba(0, 234, 245, .12), inset 0 0 20px rgba(0, 230, 240, .04);
+  backdrop-filter: blur(18px);
+  transform: translateX(-50%);
+  animation: ownerNoticeIn .18s ease-out;
+}
+
+.owner-session-notice-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 238, 249, .34);
+  color: #7cf7ff;
+  background: rgba(0, 229, 241, .08);
+  box-shadow: 0 0 18px rgba(0, 233, 244, .10);
+}
+
+.owner-session-notice-copy {
+  font-size: 13px;
+  line-height: 1.45;
+  letter-spacing: .015em;
+}
+
+.owner-session-notice-state {
+  grid-column: 2;
+  margin-top: -3px;
+  color: #7fc6cc;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .20em;
+}
+
+.owner-session-notice.is-verifying .owner-session-notice-icon svg {
+  animation: ownerSpin .8s linear infinite;
+}
+
+.owner-session-notice.is-verified {
+  border-color: rgba(73, 246, 188, .35);
+}
+
+.owner-session-notice.is-verified .owner-session-notice-icon {
+  color: #73f2c5;
+  border-color: rgba(73, 246, 188, .35);
+}
+
+/* Locked-owner visual state: keep the interface quiet until the passkey is verified. */
+html[data-owner-session="locked"] .voice-error,
+html[data-owner-session="verifying"] .voice-error {
+  display: none;
+}
+
+html[data-owner-session="locked"] .hud,
+html[data-owner-session="verifying"] .hud {
+  cursor: pointer;
+}
+
+html[data-owner-session="verifying"] .hud {
+  filter: saturate(.78) brightness(.85);
+}
+
+/* Remove the extra status pill below the core. The central state is clearer and
+   matches the supplied ELP reference composition. */
+.active-state {
+  display: none !important;
+}
+
+/* Make the main ELP control read as one deliberate object instead of a tiny
+   center inside an oversized radar field. */
+@media (max-width: 800px) {
+  .voice-stage {
+    padding-top: calc(76px + env(safe-area-inset-top));
+    padding-bottom: calc(164px + env(safe-area-inset-bottom));
+  }
+
+  .hud {
+    --hud-size: min(91vw, 54vh, 500px);
+  }
+
+  .hud-center {
+    width: 47%;
+    height: 47%;
+    gap: 10px;
+    background: radial-gradient(circle, rgba(0, 9, 12, .94) 0 49%, rgba(0, 28, 33, .72) 69%, transparent 72%);
+    box-shadow:
+      0 0 0 1px rgba(0, 239, 248, .25),
+      0 0 44px rgba(0, 236, 246, .22),
+      inset 0 0 30px rgba(0, 238, 248, .10);
+  }
+
+  .hud-center strong {
+    font-size: clamp(38px, 12vw, 54px);
+    font-weight: 350;
+    letter-spacing: .24em;
+    padding-left: .24em;
+  }
+
+  .voice-wave {
+    height: 24px;
+    gap: 4px;
+  }
+
+  .voice-wave i {
+    width: 3px;
+  }
+
+  .voice-state {
+    font-size: 7.6px;
+    letter-spacing: .14em;
+    min-height: 20px;
+  }
+
+  .ring-inner {
+    inset: 31%;
+  }
+
+  .ring-ticks {
+    inset: 23%;
+  }
+
+  .ring-arc-a {
+    inset: 9%;
+  }
+
+  .ring-arc-b {
+    inset: 17%;
+  }
+
+  .system-signature {
+    bottom: calc(112px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 430px) {
+  .hud {
+    --hud-size: min(93vw, 52vh, 455px);
+  }
+
+  .hud-center {
+    width: 49%;
+    height: 49%;
+  }
+
+  .hud-center strong {
+    font-size: clamp(36px, 12.8vw, 48px);
+  }
+
+  .voice-state {
+    font-size: 7px;
+  }
+
+  .owner-session-notice {
+    bottom: max(112px, calc(env(safe-area-inset-bottom) + 96px));
+    padding: 13px 14px;
+    border-radius: 16px;
+  }
+
+  .owner-session-notice-copy {
+    font-size: 12px;
+  }
+}
+
+@keyframes ownerNoticeIn {
+  from { opacity: 0; transform: translate(-50%, 10px) scale(.985); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@keyframes ownerSpin {
+  to { transform: rotate(360deg); }
+}
