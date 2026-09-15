@@ -19,6 +19,7 @@
     { "path": "/api/cron/communications-sync", "schedule": "*/2 * * * *" },
     { "path": "/api/cron/subscription-lifecycle", "schedule": "13 */6 * * *" },
     { "path": "/api/cron/integration-health", "schedule": "19 * * * *" },
-    { "path": "/api/cron/security-monitor", "schedule": "27 * * * *" }
+    { "path": "/api/cron/security-monitor", "schedule": "27 * * * *" },
+    { "path": "/api/cron/security-audit-export", "schedule": "33 * * * *" }
   ]
 }
