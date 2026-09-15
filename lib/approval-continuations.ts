@@ -145,6 +145,7 @@ export async function persistApprovalContinuation(profileId: string, envelope: A
   const id = created[0]?.id;
   if (!id) return null;
   await publishApprovalPresenceNotification(profileId, {
+    nonce: envelope.nonce,
     continuationId: id,
     summary: envelope.summary,
     toolSlug: envelope.toolSlug,
@@ -204,7 +205,7 @@ export async function updateApprovalContinuation(profileId: string, id: string, 
   if (input.status === 'failed') metadata.failedAt = now;
   if (input.error) metadata.error = clip(input.error, 1000);
   const updated = await found.handles.session.updateMessage(found.message.id, metadata);
-  await resolveApprovalPresenceNotification(profileId, found.record.id)
+  await resolveApprovalPresenceNotification(profileId, found.record.nonce)
     .catch((error) => console.error('ELP approval presence notification resolution failed', error));
   return updated.id;
 }
