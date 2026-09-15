@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { listApprovalContinuations } from '@/lib/approval-continuations';
 import { getApprovalLedger } from '@/lib/approval-ledger';
 import { PROFILE_COOKIE, verifyProfileToken } from '@/lib/security';
 
@@ -16,6 +17,13 @@ function profileFrom(request: Request) {
 export async function GET(request: Request) {
   const profile = profileFrom(request);
   if (!profile) return NextResponse.json({ error: 'Identity not established.' }, { status: 401 });
-  const ledger = await getApprovalLedger(profile.profileId);
-  return NextResponse.json(ledger, { headers: { 'Cache-Control': 'no-store, private' } });
+  const [ledger, continuations] = await Promise.all([
+    getApprovalLedger(profile.profileId),
+    listApprovalContinuations(profile.profileId).catch(() => []),
+  ]);
+  return NextResponse.json({
+    ...ledger,
+    continuations,
+    resumablePending: continuations.filter((item) => item.status === 'pending').length,
+  }, { headers: { 'Cache-Control': 'no-store, private' } });
 }
