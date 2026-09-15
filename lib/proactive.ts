@@ -131,7 +131,7 @@ export async function generateProactiveBriefing(args: {
       args.profileId,
       session,
       'assistant',
-      `[JARBIS ${args.kind.toUpperCase()} BRIEFING]\nGenerated: ${briefing.generatedAt}\nTimezone: ${timezone}\n\n${briefing.summary}`,
+      `[ELP ${args.kind.toUpperCase()} BRIEFING]\nGenerated: ${briefing.generatedAt}\nTimezone: ${timezone}\n\n${briefing.summary}`,
     );
   }
 
