@@ -1,5 +1,5 @@
 import { executeComposioTool, isComposioConfigured } from '@/lib/composio';
-import { getReasoningProviders } from '@/lib/elp';
+import { getReasoningProviders } from '@/lib/reasoning-providers';
 import { HERMES_TRADING_SKILLS } from '@/lib/trading-skills';
 
 export type TradingAgentRole =
