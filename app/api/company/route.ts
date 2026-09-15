@@ -4,10 +4,12 @@ import {
   executeCompanyJob,
   getCompanyJob,
   getProjectAttachment,
+  getProjectStatus,
   listAgentPerformance,
   listCompanyEvents,
   listCompanyJobs,
   listCompanyPositions,
+  listCompanySchedules,
   listProjectAttachments,
   type CompanyGoal,
   type CompanyId,
@@ -41,6 +43,15 @@ export async function GET(request: Request) {
       const company = url.searchParams.get('company') as CompanyId | null;
       if (!company) return NextResponse.json({ error: 'company is required.' }, { status: 400 });
       return NextResponse.json(await getProjectAttachment(company));
+    }
+    if (resource === 'status') {
+      const company = url.searchParams.get('company') as CompanyId | null;
+      if (!company) return NextResponse.json({ error: 'company is required.' }, { status: 400 });
+      return NextResponse.json(await getProjectStatus(company));
+    }
+    if (resource === 'schedules') {
+      const company = url.searchParams.get('company') as CompanyId | null;
+      return NextResponse.json(await listCompanySchedules(company || undefined));
     }
     if (resource === 'events') return NextResponse.json(await listCompanyEvents());
     if (resource === 'performance') return NextResponse.json(await listAgentPerformance());
