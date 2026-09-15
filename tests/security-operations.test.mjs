@@ -79,13 +79,15 @@ test('passkey session authority and high-risk action lifecycle feed security aud
     'app/api/authority-session/route.ts',
     'app/api/authority-control/route.ts',
     'app/api/actions/approve/route.ts',
-    'app/api/actions/execute/route.ts',
   ]) {
     assert.match(read(path), /recordSecurityEventSafe/, `${path} should write security events`);
   }
-  const execute = read('app/api/actions/execute/route.ts');
-  assert.match(execute, /action\.high_risk_executed/);
-  assert.match(execute, /action\.high_risk_failed/);
+  const executeRoute = read('app/api/actions/execute/route.ts');
+  const governor = read('lib/action-governor.ts');
+  assert.match(executeRoute, /executeGovernedAction/);
+  assert.match(governor, /recordSecurityEventSafe/);
+  assert.match(governor, /action\.high_risk_executed/);
+  assert.match(governor, /action\.high_risk_failed/);
 });
 
 test('security operations console exposes posture integrity incidents sessions and guarded lockdown', () => {
