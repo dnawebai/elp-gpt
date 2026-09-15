@@ -18,12 +18,16 @@ test('owner session becomes mandatory after passkey enrollment', async () => {
   assert.match(passkeys, /createPrincipalSessionToken/);
 });
 
-test('standing authority is explicit, exact and kill-switchable', async () => {
+test('standing authority is explicit, exact, kill-switchable and fail-closed', async () => {
   const text = await source('lib/standing-authority.ts');
   assert.match(text, /killSwitch/);
   assert.match(text, /allowedToolSlugs\.includes\(slug\)/);
   assert.match(text, /maxActionsPerDay/);
   assert.match(text, /allowHighRisk/);
+  assert.match(text, /!domains\.length/);
+  assert.match(text, /amount === null/);
+  assert.match(text, /!currency \|\| currency !== p\.currency/);
+  assert.match(text, /A currency is required when a maximum amount is configured/);
   assert.match(text, /No active standing authority policy matches this exact action/);
 });
 
