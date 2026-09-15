@@ -1,0 +1,24 @@
+project_id: elp_gpt
+status: attached
+agent_company_repo: dnawebai/elp-agent-company
+control_plane_company: elp_gpt
+ownership: permanent_project_pod
+product_repo: dnawebai/elp-gpt
+pair_pattern: lead_challenger
+worktree_mode: isolated
+shared_support:
+  - portfolio-ceo
+  - chief-operating-orchestrator
+  - senior-hr-director
+  - talent-intelligence-director
+  - chief-research-opportunity
+  - memory-knowledge-architect
+  - chief-finance-capital
+  - security-governance-director
+  - portfolio-general-counsel
+operating_rules:
+  - Outcomes must be verified before completion is reported.
+  - Incumbent output is independently challenged before acceptance.
+  - Failed or weak performers escalate to HR and can be replaced by the challenger.
+  - Secrets and credentials must never be committed to Git.
+  - Consequential external actions require the configured approval level.
