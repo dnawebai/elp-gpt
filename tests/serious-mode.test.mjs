@@ -43,9 +43,9 @@ test('consequential actions remain behind ELP approval controls', () => {
   assert.doesNotMatch(swarm, /executeComposioTool/);
 });
 
-test('normal ELP chat supports explicit Serious Mode without hijacking ordinary chat', () => {
+test('normal ELP chat supports explicit Serious or AGI Mode without hijacking ordinary chat', () => {
   assert.match(router, /mode: 'slashy' \| 'vellum' \| 'serious'/);
-  assert.match(router, /\/serious/);
+  assert.match(router, /serious\|agi/);
   assert.match(router, /if \(mode === 'serious'\)/);
   assert.match(router, /if \(!mode\) return \{ handled: false \}/);
 });
