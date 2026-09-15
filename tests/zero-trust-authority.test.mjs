@@ -21,10 +21,17 @@ test('principal access is one-time and delegated high risk requires step-up',asy
 });
 
 test('action pipeline binds planning approval and execution to live zero-trust authority',async()=>{
-  const files=await Promise.all(['app/api/actions/plan/route.ts','app/api/actions/approve/route.ts','app/api/actions/execute/route.ts'].map(source));
-  for(const file of files) assert.match(file,/resolveZeroTrustAuthority/);
-  assert.match(files[0],/principalId: context\.principal\.id/);
-  assert.match(files[2],/token\.principalId !== context\.principal\.id/);
+  const [plan,approve,execute,governor]=await Promise.all([
+    source('app/api/actions/plan/route.ts'),
+    source('app/api/actions/approve/route.ts'),
+    source('app/api/actions/execute/route.ts'),
+    source('lib/action-governor.ts'),
+  ]);
+  for(const file of [plan,approve,execute]) assert.match(file,/resolveZeroTrustAuthority/);
+  assert.match(plan,/planGovernedAction/);
+  assert.match(execute,/executeGovernedAction/);
+  assert.match(governor,/principalId: context\.principal\.id/);
+  assert.match(governor,/token\.principalId !== context\.principal\.id/);
 });
 
 test('operational APIs enforce principal capabilities',async()=>{
