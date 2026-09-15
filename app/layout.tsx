@@ -14,8 +14,8 @@ import PasskeyStepUpBridge from './PasskeyStepUpBridge';
 import ServiceWorkerRegistration from './ServiceWorkerRegistration';
 
 const SITE_URL = 'https://elpgpt.com';
-const TITLE = 'ELP GPT - AGI Evolution & Autonomous Intelligence';
-const DESCRIPTION = 'ELP GPT - AGI is an evolving private intelligence system designed to progress toward Artificial General Intelligence through multimodal reasoning, persistent memory, autonomous planning, connected tools, and permission-gated real-world execution.';
+const TITLE = 'ELP GPT - The Revolution of AGI';
+const DESCRIPTION = 'ELP GPT is an Artificial General Intelligence (AGI) system designed to perform intellectual tasks that a human can, combining advanced reasoning, persistent memory, autonomous planning, multimodal interaction, and connected real-world actions.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -26,6 +26,8 @@ export const metadata: Metadata = {
     'ELP GPT',
     'AGI',
     'Artificial General Intelligence',
+    'general intelligence',
+    'autonomous intelligence',
     'AI agent',
     'autonomous AI',
     'AI operator',
@@ -80,18 +82,18 @@ const webAppSchema = {
   '@type': 'WebApplication',
   '@id': `${SITE_URL}/#app`,
   name: 'ELP GPT',
-  alternateName: ['ELP GPT - AGI', 'ELP AI'],
+  alternateName: ['ELP GPT - The Revolution of AGI', 'ELP AI'],
   url: SITE_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
   description: DESCRIPTION,
   featureList: [
+    'Artificial General Intelligence-oriented reasoning',
     'Voice-first multimodal AI interaction',
     'Persistent contextual memory',
     'Autonomous planning and reasoning',
     'Connected-tool actions',
     'Permission-gated real-world execution',
-    'Continuous evolution toward broader general intelligence',
   ],
 };
 
