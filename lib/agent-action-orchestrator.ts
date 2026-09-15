@@ -1,7 +1,9 @@
 import { classifyActionRisk, type ActionRisk } from '@/lib/actions';
 import { executeGovernedAction, planGovernedAction } from '@/lib/action-governor';
+import { persistApprovalContinuation } from '@/lib/approval-continuations';
 import { isComposioConfigured, searchComposioTools, type ComposioToolSummary } from '@/lib/composio';
 import { getReasoningProviders } from '@/lib/reasoning-providers';
+import { verifyActionToken } from '@/lib/security';
 import type { ActionIntent } from '@/lib/agent-swarm';
 import type { ZeroTrustAuthorityContext } from '@/lib/zero-trust-authority';
 
@@ -29,6 +31,8 @@ export type GovernedAgentAction = {
   proposalToken?: string;
   executionToken?: string;
   executionResult?: unknown;
+  continuationId?: string;
+  resumableUntil?: string;
 };
 
 export type GovernedAgentActionBatch = {
@@ -186,23 +190,23 @@ async function resolveIntent(intent: ActionIntent, objective: string, context: s
   if (!tool) return { status: 'resolution_failed' as const, reason: 'Resolver did not select one of the discovered tools.' };
 
   const generatedArgs = asRecord(resolved?.arguments) || {};
-  const args = { ...defaultArguments(tool.inputSchema), ...(intent.knownArguments || {}), ...generatedArgs };
-  const validation = validateArguments(tool, args);
+  const resolvedArguments = { ...defaultArguments(tool.inputSchema), ...(intent.knownArguments || {}), ...generatedArgs };
+  const validation = validateArguments(tool, resolvedArguments);
   const reportedMissing = Array.isArray(resolved?.missingInputs)
     ? resolved.missingInputs.map((value) => clean(value, 160)).filter(Boolean).slice(0, 20)
     : [];
-  const unsupported = unsupportedSensitiveValues(args, sourceText);
+  const unsupported = unsupportedSensitiveValues(resolvedArguments, sourceText);
   const missingInputs = [...new Set([...reportedMissing, ...validation.missing, ...validation.invalid, ...unsupported.map((key) => `${key} is not grounded in supplied context`)])];
   if (!validation.schemaAvailable || missingInputs.length) {
     return {
       status: 'needs_input' as const,
       tool,
-      arguments: args,
+      arguments: resolvedArguments,
       missingInputs,
       reason: !validation.schemaAvailable ? 'Tool schema could not be verified, so autonomous planning was stopped.' : 'Required or grounded inputs are missing.',
     };
   }
-  return { status: 'resolved' as const, tool, arguments: args };
+  return { status: 'resolved' as const, tool, arguments: resolvedArguments };
 }
 
 export async function orchestrateAgentActions(args: {
@@ -211,6 +215,7 @@ export async function orchestrateAgentActions(args: {
   objective: string;
   context?: string;
   intents: ActionIntent[];
+  sourceRunId?: string;
   autoExecuteRead?: boolean;
   autoExecuteStandingWrite?: boolean;
 }): Promise<GovernedAgentActionBatch> {
@@ -294,6 +299,27 @@ export async function orchestrateAgentActions(args: {
       }
 
       const requiresApproval = plan.body.requiresApproval === true || risk === 'high';
+      let continuation: { id: string; expiresAt: string } | null = null;
+      if (requiresApproval && proposalToken) {
+        const proposal = verifyActionToken(proposalToken);
+        if (proposal) {
+          continuation = await persistApprovalContinuation(args.authority.profileId, {
+            version: 1,
+            nonce: proposal.nonce,
+            digest: proposal.digest,
+            sessionId: proposal.sessionId,
+            toolSlug: resolved.tool.slug,
+            arguments: resolved.arguments,
+            summary: intent.purpose,
+            risk: proposal.risk,
+            ...(proposal.principalId ? { proposedByPrincipalId: proposal.principalId } : {}),
+            source: 'agent',
+            ...(args.sourceRunId ? { sourceRunId: args.sourceRunId } : {}),
+            createdAt: new Date().toISOString(),
+          }).catch(() => null);
+        }
+      }
+
       actions.push({
         intent,
         status: requiresApproval ? 'approval_required' : 'planned',
@@ -306,8 +332,11 @@ export async function orchestrateAgentActions(args: {
         standingAuthorityPolicy: plan.body.standingAuthorityPolicy,
         ...(proposalToken ? { proposalToken } : {}),
         ...(!requiresApproval && executionToken ? { executionToken } : {}),
+        ...(continuation ? { continuationId: continuation.id, resumableUntil: continuation.expiresAt } : {}),
         reason: requiresApproval
-          ? (typeof plan.body.policy === 'string' ? plan.body.policy : 'Approval is required before execution.')
+          ? (continuation
+              ? 'Approval is required before execution. This exact action is durably resumable from the approval queue.'
+              : (typeof plan.body.policy === 'string' ? plan.body.policy : 'Approval is required before execution.'))
           : 'Action is planned and authorized but was not auto-executed.',
       });
     } catch (error) {
@@ -347,6 +376,8 @@ export function summarizeGovernedAgentActions(batch: GovernedAgentActionBatch | 
       risk: action.risk,
       missingInputs: action.missingInputs,
       standingAuthorityAuthorized: action.standingAuthorityAuthorized,
+      continuationId: action.continuationId,
+      resumableUntil: action.resumableUntil,
       reason: action.reason,
     })),
   };
@@ -356,7 +387,7 @@ export function governedActionExecutionSummary(batch: GovernedAgentActionBatch |
   if (!batch || !batch.attempted) return '';
   const parts = [
     batch.executed ? `${batch.executed} verified action${batch.executed === 1 ? '' : 's'} executed` : '',
-    batch.approvalRequired ? `${batch.approvalRequired} await${batch.approvalRequired === 1 ? 's' : ''} approval` : '',
+    batch.approvalRequired ? `${batch.approvalRequired} await${batch.approvalRequired === 1 ? 's' : ''} approval in the durable approval queue` : '',
     batch.needsInput ? `${batch.needsInput} need${batch.needsInput === 1 ? 's' : ''} input` : '',
     batch.unresolved ? `${batch.unresolved} unresolved` : '',
   ].filter(Boolean);
