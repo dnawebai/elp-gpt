@@ -5,7 +5,7 @@
     { "path": "/api/cron/daily-briefing", "schedule": "0 13 * * *" },
     { "path": "/api/cron/opportunity-radar", "schedule": "17 */4 * * *" },
     { "path": "/api/cron/relationship-intelligence", "schedule": "31 */8 * * *" },
-    { "path": "/api/cron/notifications", "schedule": "7 * * * *" },
+    { "path": "/api/cron/notifications", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/autonomous-jobs", "schedule": "11 * * * *" },
     { "path": "/api/cron/commitment-fulfilment", "schedule": "23 */2 * * *" },
     { "path": "/api/cron/anticipatory-chief-of-staff", "schedule": "37 */3 * * *" },
