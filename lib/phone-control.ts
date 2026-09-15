@@ -7,6 +7,7 @@ export type PhoneReadiness = {
     number: string;
     inboundAgentId?: string;
     outboundAgentId?: string;
+    inboundAgentIds?: string[];
     outboundAgentIds?: string[];
   }>;
   agents: Array<{ id: string; name?: string }>;
@@ -30,17 +31,20 @@ function clip(value: string | undefined, max: number) {
   return clean.slice(0, max);
 }
 
-function readOutboundAgentIds(item: Record<string, unknown>) {
+function readAgentIds(item: Record<string, unknown>, direction: 'inbound' | 'outbound') {
   const ids: string[] = [];
-  if (typeof item.outbound_agent_id === 'string') ids.push(item.outbound_agent_id);
-  if (Array.isArray(item.outbound_agents)) {
-    for (const entry of item.outbound_agents) {
-      if (entry && typeof entry === 'object') {
-        const id = (entry as Record<string, unknown>).agent_id;
-        if (typeof id === 'string' && id.trim()) ids.push(id.trim());
-      }
+  const legacy = item[`${direction}_agent_id`];
+  if (typeof legacy === 'string' && legacy.trim()) ids.push(legacy.trim());
+
+  const weighted = item[`${direction}_agents`];
+  if (Array.isArray(weighted)) {
+    for (const entry of weighted) {
+      if (!entry || typeof entry !== 'object') continue;
+      const id = (entry as Record<string, unknown>).agent_id;
+      if (typeof id === 'string' && id.trim()) ids.push(id.trim());
     }
   }
+
   return [...new Set(ids)];
 }
 
@@ -54,13 +58,16 @@ export async function getPhoneReadiness(profileId: string): Promise<PhoneReadine
     const numberObjects = walkObjects(numbersRaw).filter(
       (item) => typeof item.phone_number === 'string' || typeof item.phoneNumber === 'string',
     );
+
     const phoneNumbers = numberObjects
       .map((item) => {
-        const outboundAgentIds = readOutboundAgentIds(item);
+        const inboundAgentIds = readAgentIds(item, 'inbound');
+        const outboundAgentIds = readAgentIds(item, 'outbound');
         return {
           number: String(item.phone_number || item.phoneNumber),
-          ...(typeof item.inbound_agent_id === 'string' ? { inboundAgentId: item.inbound_agent_id } : {}),
+          ...(inboundAgentIds[0] ? { inboundAgentId: inboundAgentIds[0] } : {}),
           ...(outboundAgentIds[0] ? { outboundAgentId: outboundAgentIds[0] } : {}),
+          ...(inboundAgentIds.length ? { inboundAgentIds } : {}),
           ...(outboundAgentIds.length ? { outboundAgentIds } : {}),
         };
       })
@@ -82,7 +89,7 @@ export async function getPhoneReadiness(profileId: string): Promise<PhoneReadine
 
     return {
       configured: true,
-      available: phoneNumbers.length > 0 && agents.length > 0,
+      available: phoneNumbers.some((number) => Boolean(number.outboundAgentId)) && agents.length > 0,
       phoneNumbers,
       agents,
     };
